@@ -53,15 +53,6 @@ jmv::descriptives(data = MRS_long, vars = vars(sexe,   diagnostic_nick,education
     visage_visages_score_rappel_differe_9_t1, visage_visages_score_rappel_differe_9_t2),
     sd = TRUE, iqr = TRUE, skew = TRUE, kurt = TRUE)
 
-jmv::descriptives(data = MRS_long, vars = vars(sexe,   diagnostic_nick,education,  t1_age,   t2_age, 
-                                               age_difference, t1_glu_prec, t2_glu_prec, t1_hipp_e_tiv, hipp_difference,
-                                               percent_change_glu_prec,t1_glu_acc, t2_glu_acc, percent_change_glu_acc, 
-                                               slope_moca_raw, intercept_moca_raw, cluster_moca_raw, change_over_3_5,decliners,  
-                                               memor_rappel_libre_nombre_reponses_correctes_t1,memor_rappel_libre_nombre_reponses_correctes_t2,
-                                               visage_visages_score_rappel_differe_9_t1, visage_visages_score_rappel_differe_9_t2),
-                  , splitBy = "decliners", sd = TRUE, iqr = TRUE)
-
-
 
 
 
@@ -113,9 +104,67 @@ jmv::descriptives(data = MRS_long,  vars = vars(sexe, diagnostic_nick, education
                   splitBy = "traj_glu_acc", sd = TRUE, iqr = TRUE, skew = TRUE, kurt = TRUE)
 
 
+## Chi qarre ###
+help("chisq.test")
+## glu between regions
+chisq.test(MRS_long$traj_glu_prec, y = MRS_long$traj_glu_acc, correct = TRUE,
+           simulate.p.value = FALSE, B = 2000)
+table(MRS_long$traj_glu_prec, MRS_long$traj_glu_acc)
+
+## glu between decliners in both regions
+chisq.test(MRS_long$traj_glu_prec, y = MRS_long$decliners, correct = TRUE,
+           simulate.p.value = FALSE, B = 2000)
+table(MRS_long$traj_glu_prec, MRS_long$decliners)
+
+chisq_acc_decliners <- chisq.test(MRS_long$traj_glu_acc, y = MRS_long$decliners, correct = TRUE,
+           simulate.p.value = FALSE, B = 2000)
+chisq_acc_decliners
+table(MRS_long$traj_glu_acc, MRS_long$decliners)
+chisq_acc_decliners$stdres
+addmargins(table(MRS_long$traj_glu_acc, MRS_long$decliners))
+fisher.test(MRS_long$traj_glu_acc, MRS_long$decliners)
+
+## glu between clinical groups  in both regions
+chisq.test(MRS_long$traj_glu_prec, y = MRS_long$diagnostic_nick, correct = TRUE,
+           simulate.p.value = FALSE, B = 2000)
+table(MRS_long$traj_glu_prec, MRS_long$diagnostic_nick)
+
+chisq.test(MRS_long$traj_glu_acc, y = MRS_long$diagnostic_nick, correct = TRUE,
+           simulate.p.value = FALSE, B = 2000)
+table(MRS_long$traj_glu_acc, MRS_long$diagnostic_nick)
+
+chisq.test(MRS_long$traj_glu_prec, y = MRS_long$cluster_moca_raw, correct = TRUE,
+           simulate.p.value = FALSE, B = 2000)
+table(MRS_long$traj_glu_prec, MRS_long$cluster_moca_raw)
+
+chisq.test(MRS_long$traj_glu_acc, y = MRS_long$cluster_moca_raw, correct = TRUE,
+           simulate.p.value = FALSE, B = 2000)
+table(MRS_long$traj_glu_acc, MRS_long$diagnostic_nick)
+
+
+
+
+## GLM ###
+# Standard Logistic Regression - extremely high std error
+summary(glm(decliners ~ traj_glu_acc, 
+                 data = MRS_long, 
+                 family = binomial))
+
+# Firth's penalized likelihood logistic regression
+library(logistf)
+summary(logistf(decliners ~ traj_glu_acc, data = MRS_long))
 
 
 ############## Decliners and moca slope ###################
+jmv::descriptives(data = MRS_long, vars = vars(sexe,   diagnostic_nick,education,  t1_age,   t2_age, 
+                                               age_difference, t1_glu_prec, t2_glu_prec, t1_hipp_e_tiv, hipp_difference,
+                                               percent_change_glu_prec,t1_glu_acc, t2_glu_acc, percent_change_glu_acc, 
+                                               slope_moca_raw, intercept_moca_raw, cluster_moca_raw, change_over_3_5,decliners,  
+                                               memor_rappel_libre_nombre_reponses_correctes_t1,memor_rappel_libre_nombre_reponses_correctes_t2,
+                                               visage_visages_score_rappel_differe_9_t1, visage_visages_score_rappel_differe_9_t2),
+                  , splitBy = "decliners", sd = TRUE, iqr = TRUE)
+
+
 
 
 
