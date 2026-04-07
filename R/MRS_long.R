@@ -145,14 +145,29 @@ table(MRS_long$traj_glu_acc, MRS_long$diagnostic_nick)
 
 
 ## GLM ###
+library(pROC)
 # Standard Logistic Regression - extremely high std error
-summary(glm(decliners ~ traj_glu_acc, 
+logistic_decliners_t1acc <- glm(decliners ~ t1_glu_acc, 
                  data = MRS_long, 
-                 family = binomial))
+                 family = binomial)
+predicted_decliners_t1acc <- predict(logistic_decliners_t1acc, type = "response")
 
-# Firth's penalized likelihood logistic regression
-library(logistf)
-summary(logistf(decliners ~ traj_glu_acc, data = MRS_long))
+logistic_decliners_t1prec <- glm(decliners ~ t1_glu_prec, 
+            data = MRS_long, 
+            family = binomial)
+predicted_decliners_t1prec <- predict(logistic_decliners_t1prec, type = "response")
+
+logistic_decliners_t1glu <- glm(decliners ~ t1_glu_prec +t1_glu_acc,
+            data = MRS_long, 
+            family = binomial)
+predicted_decliners_t1glu <- predict(logistic_decliners_t1glu, type = "response")
+
+
+logistic_decliners_hipp <- glm(decliners ~ t1_hipp_e_tiv + t1_glu_acc,
+                                data = MRS_long, 
+                                family = binomial)
+summary(logistic_decliners_hipp)
+
 
 
 ############## Decliners and moca slope ###################
