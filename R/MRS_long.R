@@ -53,6 +53,8 @@ jmv::descriptives(data = MRS_long, vars = vars(sexe,   diagnostic_nick,education
     visage_visages_score_rappel_differe_9_t1, visage_visages_score_rappel_differe_9_t2),
     sd = TRUE, iqr = TRUE, skew = TRUE, kurt = TRUE)
 
+jmv::descriptives(data = MRS_long, vars = vars(t1_cortical_thickness_dickson, t2_cortical_thickness_dickson, thickness_difference),
+                  sd = TRUE, iqr = TRUE, skew = TRUE, kurt = TRUE)
 
 
 
@@ -79,10 +81,17 @@ MRS_long$percent_change_glu_acc <- winsorize_iqr(MRS_long$percent_change_glu_acc
 MRS_long$t1_hipp_e_tiv <- winsorize_iqr(MRS_long$t1_hipp_e_tiv, 1.5)
 MRS_long$t2_hipp_e_tiv  <- winsorize_iqr(MRS_long$t2_hipp_e_tiv , 1.5)
 MRS_long$hipp_difference  <- winsorize_iqr(MRS_long$hipp_difference , 1.5)
-
+MRS_long$t2_hipp_e_tiv  <- winsorize_iqr(MRS_long$t2_hipp_e_tiv , 1.5)
+MRS_long$t1_cortical_thickness_dickson    <- winsorize_iqr(MRS_long$t1_cortical_thickness_dickson, 1.5)
+MRS_long$thickness_difference  <- winsorize_iqr(MRS_long$thickness_difference   , 1.5)
 ############################## ANALYSES PRINCIPALES ###########################
 names(MRS_long)
 sapply(MRS_long,class)
+levels(MRS_long$diagnostic_nick)
+levels(MRS_long$decliners)
+levels(MRS_long$cluster_moca_raw)
+table(MRS_long$traj_glu_prec)
+table(MRS_long$traj_glu_acc)
 
 
 
@@ -144,6 +153,56 @@ table(MRS_long$traj_glu_acc, MRS_long$diagnostic_nick)
 
 
 
+## Glu and structure
+sapply(MRS_long,class)
+jmv::descriptives(data = MRS_long, vars = vars( t1_hipp_e_tiv ,hipp_difference,t1_cortical_thickness_dickson,thickness_difference), 
+                  sd = TRUE, iqr = TRUE, skew = TRUE, kurt = TRUE, hist = TRUE)
+
+## test with glutamate trajectories
+## Hipp
+t.test(t1_hipp_e_tiv ~ traj_glu_prec, data = MRS_long,
+       alternative = c("two.sided"),
+       mu = 0, var.equal = FALSE,
+       conf.level = 0.95)
+
+t.test(t1_hipp_e_tiv ~ traj_glu_acc, data = MRS_long,
+       alternative = c("two.sided"),
+       mu = 0, var.equal = FALSE,
+       conf.level = 0.95)
+
+t.test(hipp_difference ~ traj_glu_prec, data = MRS_long,
+       alternative = c("two.sided"),
+       mu = 0, var.equal = FALSE,
+       conf.level = 0.95)
+
+t.test(hipp_difference ~ traj_glu_acc, data = MRS_long,
+       alternative = c("two.sided"),
+       mu = 0, var.equal = FALSE,
+       conf.level = 0.95)
+
+
+## Thickness
+t.test(t1_cortical_thickness_dickson ~ traj_glu_prec, data = MRS_long,
+       alternative = c("two.sided"),
+       mu = 0, var.equal = FALSE,
+       conf.level = 0.95)
+
+t.test(t1_cortical_thickness_dickson  ~ traj_glu_acc, data = MRS_long,
+       alternative = c("two.sided"),
+       mu = 0, var.equal = FALSE,
+       conf.level = 0.95)
+
+t.test(thickness_difference  ~ traj_glu_prec, data = MRS_long,
+       alternative = c("two.sided"),
+       mu = 0, var.equal = FALSE,
+       conf.level = 0.95)
+
+t.test(thickness_difference  ~ traj_glu_acc, data = MRS_long,
+       alternative = c("two.sided"),
+       mu = 0, var.equal = FALSE,
+       conf.level = 0.95)
+
+
 ## GLM ###
 library(pROC)
 # Standard Logistic Regression - extremely high std error
@@ -181,35 +240,35 @@ jmv::descriptives(data = MRS_long, vars = vars(sexe,   diagnostic_nick,education
 
 
 
+# Regression
+lin_moca_t1glu_acc <- lm(slope_moca_raw ~ t1_glu_acc + t1_age + sexe, data = MRS_long)
+summary(lin_moca_t1glu_acc)
+lin_moca_t1glu_prec <- lm(slope_moca_raw ~ t1_glu_prec + t1_age + sexe, data = MRS_long)
+summary(lin_moca_t1glu_prec)
+
+
+## regression structure
+lin_t2hipp_t1glu_acc <- lm(t2_hipp_e_tiv ~ t1_glu_acc + t1_age + sexe, data = MRS_long)
+summary(lin_t2hipp_t1glu_acc)
+lin_t2hipp_t1glu_acc <- lm(t2_cortical_thickness_dickson ~ t1_glu_acc + t1_age + sexe, data = MRS_long)
+summary(lin_t2hipp_t1glu_acc)
+lin_t2thick_t1glu_prec <- lm(t2_hipp_e_tiv ~ t1_glu_prec + t1_age + sexe, data = MRS_long)
+summary(lin_t2thick_t1glu_prec)
+lin_t2thick_t1glu_prec <- lm(t2_cortical_thickness_dickson ~ t1_glu_prec + t1_age + sexe, data = MRS_long)
+summary(lin_t2thick_t1glu_prec)
+
+lin_t2hipp_t1glu_acc <- lm(t2_hipp_e_tiv ~ t1_glu_acc, data = MRS_long)
+summary(lin_t2hipp_t1glu_acc)
+lin_t2thick_t1glu_prec <- lm(t2_cortical_thickness_dickson ~ t1_glu_prec, data = MRS_long)
+summary(lin_t2thick_t1glu_prec)
 
 
 
-################## Charctarize hipp ############################
-sapply(MRS_long,class)
-jmv::descriptives(data = MRS_long, vars = vars( t1_hipp_e_tiv,t2_hipp_e_tiv ,hipp_difference), 
-                  sd = TRUE, iqr = TRUE, skew = TRUE, kurt = TRUE, hist = TRUE)
 
 
-## test with glutamate trajectories
-t.test(hipp_difference ~ traj_glu_prec, data = MRS_long,
-       alternative = c("two.sided"),
-       mu = 0, var.equal = FALSE,
-       conf.level = 0.95)
 
-t.test(hipp_difference ~ traj_glu_acc, data = MRS_long,
-       alternative = c("two.sided"),
-       mu = 0, var.equal = FALSE,
-       conf.level = 0.95)
 
-t.test(t1_hipp_e_tiv ~ traj_glu_prec, data = MRS_long,
-       alternative = c("two.sided"),
-       mu = 0, var.equal = FALSE,
-       conf.level = 0.95)
 
-t.test(t1_hipp_e_tiv ~ traj_glu_acc, data = MRS_long,
-       alternative = c("two.sided"),
-       mu = 0, var.equal = FALSE,
-       conf.level = 0.95)
 
 ############# test with decliners and sexe  #######
 t.test(hipp_difference ~ decliners, data = MRS_long,
@@ -244,12 +303,26 @@ TukeyHSD(t1_hipp_cluster)
 library(psych)
 library(corrplot)
 help('cor.test')
-cor_vars <- c("t1_glu_prec", "t2_glu_prec", "percent_change_glu_prec", 
-  "t1_glu_acc", "t2_glu_acc", "percent_change_glu_acc",
-  "slope_moca_raw", "intercept_moca_raw", 
-  "t1_hipp_e_tiv", "t2_hipp_e_tiv", "hipp_difference", 
-  "education", "t1_age")
 
+cor_vars <- c(
+  # Demographics
+  "t1_age", "t2_age", "education",
+  
+  # Neurochemistry: Precuneus
+  "t1_glu_prec", "t2_glu_prec", "percent_change_glu_prec", 
+  
+  # Neurochemistry: ACC
+  "t1_glu_acc", "t2_glu_acc", "percent_change_glu_acc",
+  
+  # Structure: Dickerson Signature
+  "t1_cortical_thickness_dickson", "t2_cortical_thickness_dickson", "thickness_difference",
+  
+  # Structure: Hippocampus
+  "t1_hipp_e_tiv", "t2_hipp_e_tiv", "hipp_difference",
+  
+  # Cognition
+  "slope_moca_raw"
+)
 cor_results <- corr.test(MRS_long[, cor_vars], use = "pairwise", 
                          method = "pearson",  adjust = "none")
 r_matrix <- cor_results$r
@@ -261,8 +334,6 @@ corrplot(r_matrix, method = "color",type = "upper",order = "hclust",
          hclust.method = "ward.D2", p.mat = p_matrix, sig.level = 0.05,
          insig = "pch",     addCoef.col = "red",
          number.cex = 0.7)
-
-
 
 
 

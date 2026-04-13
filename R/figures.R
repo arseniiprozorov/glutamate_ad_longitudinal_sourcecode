@@ -19,3 +19,389 @@ ggplot(acc_prop, aes(x = Trajectory, y = Percentage, fill = Outcome)) +
   geom_text(aes(label = paste0(round(Percentage), "%")), 
             position = position_dodge(width = 0.9), vjust = -0.5)
 
+
+
+
+
+
+
+
+#### Figure 2 
+
+
+
+
+library(tidyr)
+library(dplyr)
+library(lme4)
+library(lmerTest)
+library(emmeans)
+library(ggplot2)
+
+# 1. Reshape ACC data and annualize the time axis
+# We filter age_difference here if you want to strictly exclude data past 3 years, 
+# or just cap the plot later to keep the model power.
+MRS_acc_long <- MRS_long %>%
+  mutate(diagnostic_nick = factor(diagnostic_nick, levels = c("HC", "SCD+", "MCI"))) %>%
+  select(pscid, diagnostic_nick, sexe, education, 
+         t1_age, t2_age, age_difference,
+         t1_glu_acc, t2_glu_acc) %>%
+  pivot_longer(
+    cols = c(t1_glu_acc, t2_glu_acc),
+    names_to = "visit",
+    values_to = "glu_acc"
+  ) %>%
+  mutate(years_elapsed = ifelse(visit == "t1_glu_acc", 0, age_difference))
+
+# 2. Run the Annualized LMM for ACC
+# Replicating Model 1: neurotransmitter ~ diagnostic group x years
+model_acc_annual <- lmer(glu_acc ~ diagnostic_nick * years_elapsed + (1 | pscid), 
+                         data = MRS_acc_long)
+
+# 3. Extract annualized slopes (Beta = change in mmol/L per year)
+acc_stats <- emtrends(model_acc_annual, ~ diagnostic_nick, var = "years_elapsed")
+acc_summary <- summary(acc_stats, infer = TRUE)
+
+# 4. Create labels for the plot
+acc_labels <- acc_summary %>%
+  mutate(label = paste0("beta == ", round(years_elapsed.trend, 2), 
+                        "~~p == ", round(p.value, 3)))
+
+# 5. Create the faceted trajectory plot capped at 3 years
+ggplot(MRS_acc_long, aes(x = years_elapsed, y = glu_acc, color = diagnostic_nick)) +
+  geom_line(aes(group = pscid), alpha = 0.2, linewidth = 0.4) +
+  geom_point(alpha = 0.5) +
+  geom_smooth(method = "lm", linewidth = 1.5, se = TRUE, aes(fill = diagnostic_nick)) +
+  facet_wrap(~ diagnostic_nick) +
+  
+  # Add Stats (Annualized Beta and P-value)
+  geom_text(data = acc_labels, aes(x = 1.5, y = Inf, label = label), 
+            vjust = 2, color = "black", parse = TRUE, inherit.aes = FALSE) +
+  
+  # Cap the X-axis at 3 years for visual clarity
+  scale_x_continuous(limits = c(0, 3), breaks = c(0, 1, 2, 3)) +
+  
+  scale_color_manual(values = c("HC" = "#3B5998", "SCD+" = "#E69F00", "MCI" = "#D55E00")) +
+  scale_fill_manual(values = c("HC" = "#3B5998", "SCD+" = "#E69F00", "MCI" = "#D55E00")) +
+  labs(
+    title = "Annualized Glutamate Trajectories: ACC",
+    subtitle = "Faceted by clinical stage; Slopes (Beta) represent change per year",
+    x = "Years from Baseline ",
+    y = "ACC Glutamate (mM)"
+  ) +
+  theme_minimal() +
+  theme(legend.position = "none", panel.grid.minor = element_blank())
+
+
+
+
+
+library(tidyr)
+library(dplyr)
+library(lme4)
+library(lmerTest)
+library(emmeans)
+library(ggplot2)
+
+# 1. Reshape Precuneus data and annualize the time axis
+MRS_prec_long <- MRS_long %>%
+  mutate(diagnostic_nick = factor(diagnostic_nick, levels = c("HC", "SCD+", "MCI"))) %>%
+  select(pscid, diagnostic_nick, sexe, education, 
+         t1_age, t2_age, age_difference,
+         t1_glu_prec, t2_glu_prec) %>%
+  pivot_longer(
+    cols = c(t1_glu_prec, t2_glu_prec),
+    names_to = "visit",
+    values_to = "glu_prec"
+  ) %>%
+  mutate(years_elapsed = ifelse(visit == "t1_glu_prec", 0, age_difference))
+
+# 2. Run the Annualized LMM for Precuneus
+# Replicating Model 1 from the paper: neurotransmitter ~ diagnosis * years
+model_prec_annual <- lmer(glu_prec ~ diagnostic_nick * years_elapsed + (1 | pscid), 
+                          data = MRS_prec_long)
+
+# 3. Extract annualized slopes (Beta = change in mmol/L per year)
+prec_stats <- emtrends(model_prec_annual, ~ diagnostic_nick, var = "years_elapsed")
+prec_summary <- summary(prec_stats, infer = TRUE)
+
+# 4. Create labels for the plot
+prec_labels <- prec_summary %>%
+  mutate(label = paste0("beta == ", round(years_elapsed.trend, 2), 
+                        "~~p == ", round(p.value, 3)))
+
+# 5. Create the faceted trajectory plot capped at 3 years
+ggplot(MRS_prec_long, aes(x = years_elapsed, y = glu_prec, color = diagnostic_nick)) +
+  geom_line(aes(group = pscid), alpha = 0.2, linewidth = 0.4) +
+  geom_point(alpha = 0.5) +
+  geom_smooth(method = "lm", linewidth = 1.5, se = TRUE, aes(fill = diagnostic_nick)) +
+  facet_wrap(~ diagnostic_nick) +
+  
+  # Add Stats (Annualized Beta and P-value)
+  geom_text(data = prec_labels, aes(x = 1.5, y = Inf, label = label), 
+            vjust = 2, color = "black", parse = TRUE, inherit.aes = FALSE) +
+  
+  # Cap the X-axis at 3 years for visual clarity
+  scale_x_continuous(limits = c(0, 3), breaks = c(0, 1, 2, 3)) +
+  
+  scale_color_manual(values = c("HC" = "#3B5998", "SCD+" = "#E69F00", "MCI" = "#D55E00")) +
+  scale_fill_manual(values = c("HC" = "#3B5998", "SCD+" = "#E69F00", "MCI" = "#D55E00")) +
+  labs(
+    title = "Annualized Glutamate Trajectories: Precuneus",
+    subtitle = "Faceted by clinical stage; Slopes (Beta) represent change per year",
+    x = "Years from Baseline",
+    y = "Precuneus Glutamate (mM)"
+  ) +
+  theme_minimal() 
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  library(tidyr); library(dplyr); library(lme4); library(lmerTest); library(emmeans); library(ggplot2)
+
+# --- DATA PREP ---
+MRS_decline_long <- MRS_long %>%
+  mutate(decliners = factor(decliners, levels = c("0", "1"))) %>%
+  select(pscid, decliners, age_difference, t1_glu_acc, t2_glu_acc, t1_glu_prec, t2_glu_prec) %>%
+  pivot_longer(cols = matches("glu_"), names_to = c("time", "region"), names_pattern = "(t[12])_glu_(.*)") %>%
+  mutate(years_elapsed = ifelse(time == "t1", 0, age_difference))
+
+# --- PRECUNEUS MODEL ---
+mod_prec_dec <- lmer(value ~ decliners * years_elapsed + (1 | pscid), 
+                     data = filter(MRS_decline_long, region == "prec"))
+stats_prec_dec <- summary(emtrends(mod_prec_dec, ~ decliners, var = "years_elapsed"), infer = TRUE)
+lab_prec_dec <- stats_prec_dec %>% mutate(label = paste0("beta == ", round(years_elapsed.trend, 2), "~~p == ", round(p.value, 3)))
+
+# --- ACC MODEL ---
+mod_acc_dec <- lmer(value ~ decliners * years_elapsed + (1 | pscid), 
+                    data = filter(MRS_decline_long, region == "acc"))
+stats_acc_dec <- summary(emtrends(mod_acc_dec, ~ decliners, var = "years_elapsed"), infer = TRUE)
+lab_acc_dec <- stats_acc_dec %>% mutate(label = paste0("beta == ", round(years_elapsed.trend, 2), "~~p == ", round(p.value, 3)))
+
+
+
+
+ggplot(filter(MRS_decline_long, region == "prec"), aes(x = years_elapsed, y = value, color = decliners)) +
+  geom_line(aes(group = pscid), alpha = 0.2) + geom_point(alpha = 0.5) +
+  geom_smooth(method = "lm", linewidth = 1.5, se = TRUE, aes(fill = decliners)) +
+  facet_wrap(~ decliners) +
+  geom_text(data = lab_prec_dec, aes(x = 1.5, y = Inf, label = label), vjust = 2, parse = TRUE, inherit.aes = FALSE) +
+  scale_x_continuous(limits = c(0, 3)) +
+  scale_color_manual(values = c("0" = "#3B5998", "1" = "#D55E00")) +
+  scale_fill_manual(values = c("0" = "#3B5998", "1" = "#D55E00")) +
+  labs(title = "Precuneus Glutamate: Decliners (1) vs. Non-Decliners (0)", x = "Years from Baseline", y = "Glutamate (mM)") +
+  theme_minimal() + theme(legend.position = "none")
+
+
+
+
+
+
+
+ggplot(filter(MRS_decline_long, region == "acc"), aes(x = years_elapsed, y = value, color = decliners)) +
+  # Individual patient trajectories
+  geom_line(aes(group = pscid), alpha = 0.2, linewidth = 0.4) + 
+  geom_point(alpha = 0.5) +
+  # Group-level annualized slope with 95% CI
+  geom_smooth(method = "lm", linewidth = 1.5, se = TRUE, aes(fill = decliners)) +
+  # Separate into Decliners (1) and Non-Decliners (0)
+  facet_wrap(~ decliners) +
+  # Add Stats from the ACC model (Beta = change per year)
+  geom_text(data = lab_acc_dec, aes(x = 1.5, y = Inf, label = label), 
+            vjust = 2, color = "black", parse = TRUE, inherit.aes = FALSE) +
+  # Visual formatting
+  scale_x_continuous(limits = c(0, 3), breaks = c(0, 1, 2, 3)) +
+  scale_color_manual(values = c("0" = "#3B5998", "1" = "#D55E00")) +
+  scale_fill_manual(values = c("0" = "#3B5998", "1" = "#D55E00")) +
+  labs(
+    title = "ACC Glutamate: Decliners (1) vs. Non-Decliners (0)",
+    subtitle = "Annualized trajectories; beta represents change in mM per year",
+    x = "Years from Baseline (Capped at 3 Years)",
+    y = "Glutamate (mM)"
+  ) +
+  theme_minimal() + 
+  theme(legend.position = "none", panel.grid.minor = element_blank())
+
+
+
+
+
+
+
+
+
+
+
+
+
+######## Regressions 
+
+library(ggplot2)
+library(tidyr)
+library(dplyr)
+
+# 1. Prepare the data for faceting by region
+plot_data_t1 <- MRS_long %>%
+  select(pscid, diagnostic_nick, slope_moca_raw, t1_glu_prec, t1_glu_acc) %>%
+  pivot_longer(cols = c(t1_glu_prec, t1_glu_acc), 
+               names_to = "region", 
+               values_to = "t1_glutamate") %>%
+  mutate(region = ifelse(region == "t1_glu_prec", "Precuneus", "ACC"),
+         diagnostic_nick = factor(diagnostic_nick, levels = c("HC", "SCD+", "MCI")))
+
+# 2. Create the regression plot
+ggplot(plot_data_t1, aes(x = t1_glutamate, y = slope_moca_raw)) +
+  # Add points colored by clinical group
+  geom_point(aes(color = diagnostic_nick), alpha = 0.6, size = 2.5) +
+  # Add the linear regression line for the whole cohort
+  geom_smooth(method = "lm", color = "black", linewidth = 1.2, se = TRUE) +
+  # Facet by region (Precuneus vs. ACC)
+  facet_wrap(~ region, scales = "free_x") +
+  # Styling to match the paper
+  scale_color_manual(values = c("HC" = "#3B5998", "SCD+" = "#E69F00", "MCI" = "#D55E00")) +
+  labs(
+    title = "Baseline Glutamate (T1) vs. Cognitive Decline (MoCA Slope)",
+    subtitle = "",
+    x = "Baseline Glutamate Concentration (mM)",
+    y = "MoCA Slope (Change in Score per Year)",
+    color = "Diagnosis"
+  ) +
+  theme_minimal() +
+  theme(panel.grid.minor = element_blank())
+
+
+
+
+
+
+
+
+
+
+
+
+
+#### Regressions #####
+
+
+
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+
+# 1. Prepare data (ensure groups are ordered)
+plot_data_t1_groups <- MRS_long %>%
+  select(pscid, diagnostic_nick, slope_moca_raw, t1_glu_prec, t1_glu_acc) %>%
+  pivot_longer(cols = c(t1_glu_prec, t1_glu_acc), 
+               names_to = "region", 
+               values_to = "t1_glutamate") %>%
+  mutate(region = ifelse(region == "t1_glu_prec", "Precuneus", "ACC"),
+         diagnostic_nick = factor(diagnostic_nick, levels = c("HC", "SCD+", "MCI")))
+
+# 2. Create group-wise regression plot
+ggplot(plot_data_t1_groups, aes(x = t1_glutamate, y = slope_moca_raw, color = diagnostic_nick, fill = diagnostic_nick)) +
+  geom_point(alpha = 0.6, size = 2.5) +
+  # Add separate regression lines for each diagnostic group
+  geom_smooth(method = "lm", alpha = 0.2, linewidth = 1.2) +
+  # Facet by region
+  facet_wrap(~ region, scales = "free_x") +
+  # Styling
+  scale_color_manual(values = c("HC" = "#3B5998", "SCD+" = "#E69F00", "MCI" = "#D55E00")) +
+  scale_fill_manual(values = c("HC" = "#3B5998", "SCD+" = "#E69F00", "MCI" = "#D55E00")) +
+  labs(
+    title = "Group-Wise Associations: T1 Glutamate vs. MoCA Slope",
+    subtitle = "Testing if the baseline glutamate-cognition link differs by stage",
+    x = "Baseline Glutamate Concentration (mM)",
+    y = "MoCA Slope (Change in Score per Year)",
+    color = "Diagnosis",
+    fill = "Diagnosis"
+  ) +
+  theme_minimal() +
+  theme(panel.grid.minor = element_blank())
+
+
+
+
+
+
+### Structual ####
+library(ggplot2)
+library(dplyr)
+library(patchwork) # This package is magic for combining separate plots
+
+# Ensure your diagnostic group is ordered properly
+MRS_long <- MRS_long %>%
+  mutate(diagnostic_nick = factor(diagnostic_nick, levels = c("HC", "SCD+", "MCI")))
+
+# =========================================================================
+# 1. HELPER FUNCTION: Builds a plot with specific labels and calculates stats
+# =========================================================================
+create_scatter <- function(data, x_var, y_var, x_lab, y_lab) {
+  
+  # A. Calculate the overall model stats for the whole sample
+  mod <- lm(data[[y_var]] ~ data[[x_var]], data = data)
+  beta_val <- round(summary(mod)$coefficients[2, "Estimate"], 3)
+  p_val <- summary(mod)$coefficients[2, "Pr(>|t|)"]
+  
+  # B. Format the p-value nicely
+  p_text <- ifelse(p_val < 0.001, "p < 0.001", paste0("p = ", round(p_val, 3)))
+  
+  # C. Create the label string (using the unicode character for beta: β)
+  stat_label <- paste0("\u03B2 = ", beta_val, " | ", p_text)
+  
+  # D. Build the plot
+  ggplot(data, aes(x = .data[[x_var]], y = .data[[y_var]])) +
+    geom_point(aes(color = diagnostic_nick), alpha = 0.6, size = 2.5) +
+    geom_smooth(method = "lm", color = "black", fill = "gray70", alpha = 0.3, linewidth = 1.2) +
+    scale_color_manual(values = c("HC" = "#3B5998", "SCD+" = "#E69F00", "MCI" = "#D55E00")) +
+    
+    # Specific X and Y labels applied here!
+    labs(x = x_lab, y = y_lab) + 
+    
+    theme_minimal() +
+    theme(
+      panel.grid.minor = element_blank(),
+      plot.margin = margin(15, 15, 15, 15)
+    ) +
+    # Stamp the stats dynamically in the top-left corner (-Inf, Inf)
+    annotate("text", x = -Inf, y = Inf, label = stat_label, 
+             hjust = -0.1, vjust = 1.5, size = 4.5, fontface = "bold", color = "black")
+}
+
+# =========================================================================
+# 2. GENERATE THE 4 INDIVIDUAL PLOTS
+# =========================================================================
+p1 <- create_scatter(MRS_long, "t1_glu_acc", "t2_hipp_e_tiv", 
+                     "Baseline ACC Glutamate", "T2 Hippocampal Volume")
+
+p2 <- create_scatter(MRS_long, "t1_glu_acc", "t2_cortical_thickness_dickson", 
+                     "Baseline ACC Glutamate", "T2 Cortical Thickness")
+
+p3 <- create_scatter(MRS_long, "t1_glu_prec", "t2_hipp_e_tiv", 
+                     "Baseline Precuneus Glutamate", "T2 Hippocampal Volume")
+
+p4 <- create_scatter(MRS_long, "t1_glu_prec", "t2_cortical_thickness_dickson", 
+                     "Baseline Precuneus Glutamate", "T2 Cortical Thickness")
+
+# =========================================================================
+# 3. COMBINE THEM INTO A 2x2 GRID USING PATCHWORK
+# =========================================================================
+# The (p1 | p2) / (p3 | p4) syntax tells patchwork to put 1 and 2 on top, 3 and 4 on bottom
+final_plot <- (p1 | p2) / (p3 | p4) + 
+  plot_layout(guides = 'collect') + # This merges the 4 legends into one single legend on the side
+  plot_annotation(
+    title = "Associations Between Baseline Glutamate and Follow-up Brain Structure",
+    theme = theme(plot.title = element_text(size = 14, face = "bold", hjust = 0.5))
+  )
+
+# View the final result
+final_plot
