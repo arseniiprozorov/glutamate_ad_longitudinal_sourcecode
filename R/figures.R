@@ -405,3 +405,15 @@ final_plot <- (p1 | p2) / (p3 | p4) +
 
 # View the final result
 final_plot
+
+
+
+
+
+
+
+
+
+
+
+

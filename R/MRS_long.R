@@ -96,6 +96,14 @@ table(MRS_long$traj_glu_acc)
 
 
 
+# 1. ANOVA for ACC Percentage Change
+anova_acc <- aov(percent_change_glu_acc ~ decliners, data = MRS_long)
+summary(anova_acc)
+
+# 2. ANOVA for Precuneus Percentage Change
+anova_prec <- aov(percent_change_glu_prec ~ decliners, data = MRS_long)
+summary(anova_prec)
+
 
 
 ############## Characterising Glu ################
@@ -210,22 +218,40 @@ logistic_decliners_t1acc <- glm(decliners ~ t1_glu_acc,
                  data = MRS_long, 
                  family = binomial)
 predicted_decliners_t1acc <- predict(logistic_decliners_t1acc, type = "response")
+summary(logistic_decliners_t1acc)
+exp(coef(logistic_decliners_t1acc)) 
+exp(confint(logistic_decliners_t1acc))
+roc_acc <- roc(logistic_decliners_t1acc$y, predicted_decliners_t1acc)
+auc(roc_acc)
+ci.auc(roc_acc)
 
+# Precuneus
 logistic_decliners_t1prec <- glm(decliners ~ t1_glu_prec, 
             data = MRS_long, 
             family = binomial)
 predicted_decliners_t1prec <- predict(logistic_decliners_t1prec, type = "response")
+summary(logistic_decliners_t1prec)
+exp(coef(logistic_decliners_t1prec)) 
+exp(confint(logistic_decliners_t1prec))
+roc_prec <- roc(logistic_decliners_t1prec$y, predicted_decliners_t1prec)
+auc(roc_prec)
+ci.auc(roc_prec)
 
+# Combined 
 logistic_decliners_t1glu <- glm(decliners ~ t1_glu_prec +t1_glu_acc,
             data = MRS_long, 
             family = binomial)
 predicted_decliners_t1glu <- predict(logistic_decliners_t1glu, type = "response")
+summary(logistic_decliners_t1glu)
+exp(coef(logistic_decliners_t1glu)) 
+exp(confint(logistic_decliners_t1glu))
 
 
-logistic_decliners_hipp <- glm(decliners ~ t1_hipp_e_tiv + t1_glu_acc,
-                                data = MRS_long, 
-                                family = binomial)
-summary(logistic_decliners_hipp)
+
+
+
+
+
 
 
 
