@@ -282,6 +282,67 @@ ggplot(plot_data_t1, aes(x = t1_glutamate, y = slope_moca_raw)) +
 
 
 
+# 1. Prepare the data for faceting by region
+plot_data_t1 <- MRS_long %>%
+  select(pscid, diagnostic_nick, slope_moca_raw, t1_glu_prec, t1_glu_acc) %>%
+  pivot_longer(cols = c(t1_glu_prec, t1_glu_acc), 
+               names_to = "region", 
+               values_to = "t1_glutamate") %>%
+  mutate(region = ifelse(region == "t1_glu_prec", "Precuneus", "ACC"),
+         diagnostic_nick = factor(diagnostic_nick, levels = c("HC", "SCD+", "MCI")))
+
+# 2. Create the regression plot
+ggplot(plot_data_t1, aes(x = t1_glutamate, y = slope_moca_raw)) +
+  # Add points colored by clinical group
+  geom_point(aes(color = diagnostic_nick), alpha = 0.6, size = 2.5) +
+  # Add the linear regression line for the whole cohort
+  geom_smooth(method = "lm", color = "black", linewidth = 1.2, se = TRUE) +
+  # Facet by region (Precuneus vs. ACC)
+  facet_wrap(~ region, scales = "free_x") +
+  # Styling to match the paper
+  scale_color_manual(values = c("HC" = "#3B5998", "SCD+" = "#E69F00", "MCI" = "#D55E00")) +
+  labs(
+    title = "Baseline Glutamate (T1) vs. Cognitive Decline (MoCA Slope)",
+    subtitle = "",
+    x = "Baseline Glutamate Concentration (mM)",
+    y = "MoCA Slope (Change in Score per Year)",
+    color = "Diagnosis"
+  ) +
+  theme_minimal() +
+  theme(panel.grid.minor = element_blank())
+
+
+
+
+
+# 1. Prepare the data for faceting by region
+plot_data_t2 <- MRS_long %>%
+  select(pscid, diagnostic_nick, slope_moca_raw, t2_glu_prec, t2_glu_acc) %>%
+  pivot_longer(cols = c(t2_glu_prec, t2_glu_acc), 
+               names_to = "region", 
+               values_to = "t2_glutamate") %>%
+  mutate(region = ifelse(region == "t2_glu_prec", "Precuneus", "ACC"),
+         diagnostic_nick = factor(diagnostic_nick, levels = c("HC", "SCD+", "MCI")))
+
+# 2. Create the regression plot
+ggplot(plot_data_t2, aes(x = t2_glutamate, y = slope_moca_raw)) +
+  # Add points colored by clinical group
+  geom_point(aes(color = diagnostic_nick), alpha = 0.6, size = 2.5) +
+  # Add the linear regression line for the whole cohort
+  geom_smooth(method = "lm", color = "black", linewidth = 1.2, se = TRUE) +
+  # Facet by region (Precuneus vs. ACC)
+  facet_wrap(~ region, scales = "free_x") +
+  # Styling to match the paper
+  scale_color_manual(values = c("HC" = "#3B5998", "SCD+" = "#E69F00", "MCI" = "#D55E00")) +
+  labs(
+    title = "Glutamate (T2) vs. Cognitive Decline (MoCA Slope)",
+    subtitle = "",
+    x = "T2 Glutamate Concentration (mM)",
+    y = "MoCA Slope (Change in Score per Year)",
+    color = "Diagnosis"
+  ) +
+  theme_minimal() +
+  theme(panel.grid.minor = element_blank())
 
 
 
@@ -407,6 +468,87 @@ final_plot <- (p1 | p2) / (p3 | p4) +
 final_plot
 
 
+
+
+
+
+
+######## Regressions (Quadratic Fit)
+
+library(ggplot2)
+library(tidyr)
+library(dplyr)
+
+# 1. Prepare the data for faceting by region
+plot_data_t1 <- MRS_long %>%
+  select(pscid, diagnostic_nick, slope_moca_raw, t1_glu_prec, t1_glu_acc) %>%
+  pivot_longer(cols = c(t1_glu_prec, t1_glu_acc), 
+               names_to = "region", 
+               values_to = "t1_glutamate") %>%
+  mutate(region = ifelse(region == "t1_glu_prec", "Precuneus", "ACC"),
+         diagnostic_nick = factor(diagnostic_nick, levels = c("HC", "SCD+", "MCI")))
+
+# 2. Create the quadratic regression plot
+ggplot(plot_data_t1, aes(x = t1_glutamate, y = slope_moca_raw)) +
+  # Add points colored by clinical group
+  geom_point(aes(color = diagnostic_nick), alpha = 0.6, size = 2.5) +
+  # Add the QUADRATIC regression line for the whole cohort
+  geom_smooth(method = "lm", formula = y ~ poly(x, 2), color = "black", linewidth = 1.2, se = TRUE) +
+  # Facet by region (Precuneus vs. ACC)
+  facet_wrap(~ region, scales = "free_x") +
+  # Styling to match the paper
+  scale_color_manual(values = c("HC" = "#3B5998", "SCD+" = "#E69F00", "MCI" = "#D55E00")) +
+  labs(
+    title = "Baseline Glutamate (T1) vs. Cognitive Decline (MoCA Slope)",
+    subtitle = "Quadratic Fit",
+    x = "Baseline Glutamate Concentration (mM)",
+    y = "MoCA Slope (Change in Score per Year)",
+    color = "Diagnosis"
+  ) +
+  theme_minimal() +
+  theme(panel.grid.minor = element_blank())
+
+
+
+
+
+
+
+
+# 1. We keep your same variables
+glu_vars <- c("t1_glu_prec", "t1_glu_acc")
+test_vars <- c("slope_moca_raw", 
+               "t1_cortical_thickness_dickson", 
+               "t1_hipp_e_tiv", 
+               "memor_rappel_libre_nombre_reponses_correctes_t1",
+               "visage_visages_score_rappel_differe_9_t1")
+
+results_flipped <- list()
+
+for (glu in glu_vars) {
+  for (var in test_vars) {
+    # We mean-center the Predictor (the clinical/structural var) to see the curve clearly
+    centered_var <- scale(MRS_long[[var]], center = TRUE, scale = FALSE)
+    
+    # FORMULA: Glutamate ~ Var + Var^2 + Age + Sexe
+    form <- as.formula(paste(glu, "~ centered_var + I(centered_var^2) + t1_age + sexe"))
+    
+    fit <- lm(form, data = MRS_long)
+    
+    res <- as.data.frame(summary(fit)$coefficients)
+    res$predictor_var <- var
+    res$outcome_glu <- glu
+    res$term <- rownames(res)
+    
+    results_flipped[[paste(glu, var, sep = "_")]] <- res
+  }
+}
+
+all_flipped_results <- do.call(rbind, results_flipped)
+
+# Filter for significant quadratic terms
+sig_flipped <- subset(all_flipped_results, grepl("I\\(", term) & `Pr(>|t|)` < 0.05)
+print(sig_flipped)
 
 
 

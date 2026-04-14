@@ -271,6 +271,17 @@ lin_moca_t1glu_acc <- lm(slope_moca_raw ~ t1_glu_acc + t1_age + sexe, data = MRS
 summary(lin_moca_t1glu_acc)
 lin_moca_t1glu_prec <- lm(slope_moca_raw ~ t1_glu_prec + t1_age + sexe, data = MRS_long)
 summary(lin_moca_t1glu_prec)
+# The model with the linear term AND the quadratic term
+lin_moca_t1glu_prec_quad <- lm(slope_moca_raw ~ t1_glu_prec + I(t1_glu_prec^2) + t1_age + sexe, data = MRS_long)
+summary(lin_moca_t1glu_prec_quad)
+lin_moca_t1glu_acc_quad <- lm(slope_moca_raw ~ t1_glu_acc + I(t1_glu_acc^2) + t1_age + sexe, data = MRS_long)
+summary(lin_moca_t1glu_acc_quad)
+
+
+lin_moca_t2glu_acc <- lm(slope_moca_raw ~ t2_glu_acc + t1_age + sexe, data = MRS_long)
+summary(lin_moca_t2glu_acc)
+lin_moca_t2glu_prec <- lm(slope_moca_raw ~ t2_glu_prec + t1_age + sexe, data = MRS_long)
+summary(lin_moca_t2glu_prec)
 
 
 ## regression structure
@@ -292,7 +303,47 @@ summary(lin_t2thick_t1glu_prec)
 
 
 
+# --- MEAN-CENTERING PREDICTORS ---
+MRS_long$t1_glu_acc_c <- scale(MRS_long$t1_glu_acc, center = TRUE, scale = FALSE)
+MRS_long$t1_glu_prec_c <- scale(MRS_long$t1_glu_prec, center = TRUE, scale = FALSE)
 
+# 1. T2 Hippocampus ~ T1 ACC Glutamate
+quad_t2hipp_t1acc <- lm(t2_hipp_e_tiv ~ t1_glu_acc_c + I(t1_glu_acc_c^2) + t1_age + sexe, data = MRS_long)
+summary(quad_t2hipp_t1acc)
+
+# 2. T2 Cortical Thickness ~ T1 ACC Glutamate
+quad_t2thick_t1acc <- lm(t2_cortical_thickness_dickson ~ t1_glu_acc_c + I(t1_glu_acc_c^2) + t1_age + sexe, data = MRS_long)
+summary(quad_t2thick_t1acc)
+
+# 3. T2 Hippocampus ~ T1 Precuneus Glutamate
+quad_t2hipp_t1prec <- lm(t2_hipp_e_tiv ~ t1_glu_prec_c + I(t1_glu_prec_c^2) + t1_age + sexe, data = MRS_long)
+summary(quad_t2hipp_t1prec)
+
+# 4. T2 Cortical Thickness ~ T1 Precuneus Glutamate
+quad_t2thick_t1prec <- lm(t2_cortical_thickness_dickson ~ t1_glu_prec_c + I(t1_glu_prec_c^2) + t1_age + sexe, data = MRS_long)
+summary(quad_t2thick_t1prec)
+
+
+
+# --- MEAN-CENTERING PREDICTORS ---
+MRS_long$t2_hipp_c <- scale(MRS_long$t2_hipp_e_tiv, center = TRUE, scale = FALSE)
+MRS_long$t2_thick_c <- scale(MRS_long$t2_cortical_thickness_dickson, center = TRUE, scale = FALSE)
+
+# 1. T1 ACC Glutamate ~ T2 Hippocampus
+flip_t1acc_t2hipp <- lm(t1_glu_acc ~ t2_hipp_c + I(t2_hipp_c^2), data = MRS_long)
+summary(flip_t1acc_t2hipp)
+
+# 2. T1 ACC Glutamate ~ T2 Cortical Thickness
+flip_t1acc_t2thick <- lm(t1_glu_acc ~ t2_thick_c + I(t2_thick_c^2), data = MRS_long)
+summary(flip_t1acc_t2thick)
+
+# 3. T1 Precuneus Glutamate ~ T2 Hippocampus
+flip_t1prec_t2hipp <- lm(t1_glu_prec ~ t2_hipp_c + I(t2_hipp_c^2), data = MRS_long)
+summary(flip_t1prec_t2hipp)
+
+# 4. T1 Precuneus Glutamate ~ T2 Cortical Thickness
+flip_t1prec_t2thick <- lm(t1_glu_prec ~ t2_thick_c + I(t2_thick_c^2), data = MRS_long)
+summary(flip_t1prec_t2thick)
 
 
 
