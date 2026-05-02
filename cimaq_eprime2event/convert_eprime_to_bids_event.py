@@ -86,23 +86,35 @@ def set_subject_data(bID, iFolder, oFolder):
               'Output_Retrieval_*']
 
     sub_files = []
-    s_dir = glob.glob(os.path.join(iFolder, bID+'*task.zip'))
+    s_dir = glob.glob(os.path.join(iFolder, bID+'*.zip'))
     if len(s_dir) != 1:
         logging.error(' Multiple directories match \
                        this subject PSCID: {}'.format(bID))
     else:
         s_path = os.path.join(oFolder, bID+'*')
-        s_out = glob.glob(s_path)
+        s_out = [d for d in glob.glob(s_path) if os.path.isdir(d)]
         if not s_out:
             z_ref = zipfile.ZipFile(s_dir[0], 'r')
             z_ref.extractall(oFolder)
             z_ref.close()
-            s_out = glob.glob(s_path)
+            s_out = [d for d in glob.glob(s_path) if os.path.isdir(d)]
 
         if len(s_out) == 1:
             s_out = s_out[0]
             for nPrefix in prefix:
-                file = glob.glob(os.path.join(s_out, nPrefix))
+                file = []
+                prefix_str = nPrefix.replace('*', '')
+                # Search both in extracted folder AND in parent (tmp) folder directly
+                search_paths = [s_out, oFolder]
+                for search_path in search_paths:
+                    for root, dirs, files in os.walk(search_path):
+                        for fname in files:
+                            # Match both prefix and subject ID to avoid cross-subject matches
+                            if fname.startswith(prefix_str) and bID in fname:
+                                file.append(os.path.join(root, fname))
+                    if search_path == oFolder:
+                        break
+                
                 if len(file) == 1:
                     sub_files.append(file[0])
                 elif len(file) == 0:
@@ -360,7 +372,7 @@ def addPostScan(main, ret):
             'position_response', 'position_accuracy', 'position_responsetime']
     mainEnc = mainEnc[cols]
     # Re-merge mainEnc and mainCTL and re-order by trial number
-    mainMerged = mainEnc.append(mainCTL, ignore_index=True)
+    mainMerged = pd.concat([mainEnc, mainCTL], ignore_index=True)
     mainMerged.sort_values('trial_number', axis=0, ascending=True,
                            inplace=True)
     return mainMerged
@@ -434,7 +446,10 @@ def main():
         print("Running {}-{}".format(idBEH, idMRI))
         s_files = set_subject_data(idBEH, iFolder, tmpFolder)
         if(len(s_files) == 3):
-            extract_taskFile(idBEH, idMRI, s_files, fileFolder)
+            try:
+                extract_taskFile(idBEH, idMRI, s_files, fileFolder)
+            except Exception as e:
+                logging.error('Error processing subject ({},{}): {}'.format(idBEH, idMRI, str(e)))
             shutil.rmtree(tmpFolder, ignore_errors=True)
         else:
             logging.info('missing files for subject ({},{})'.format(idBEH,
