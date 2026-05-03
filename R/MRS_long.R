@@ -376,43 +376,6 @@ t1_hipp_cluster <- aov(t1_hipp_e_tiv ~ cluster_moca_raw , data = MRS_long)
 TukeyHSD(t1_hipp_cluster)
 
 
-## test correlations ##
-library(psych)
-library(corrplot)
-help('cor.test')
-
-cor_vars <- c(
-  # Demographics
-  "t1_age", "t2_age", "education",
-  
-  # Neurochemistry: Precuneus
-  "t1_glu_prec", "t2_glu_prec", "percent_change_glu_prec", 
-  
-  # Neurochemistry: ACC
-  "t1_glu_acc", "t2_glu_acc", "percent_change_glu_acc",
-  
-  # Structure: Dickerson Signature
-  "t1_cortical_thickness_dickson", "t2_cortical_thickness_dickson", "thickness_difference",
-  
-  # Structure: Hippocampus
-  "t1_hipp_e_tiv", "t2_hipp_e_tiv", "hipp_difference",
-  
-  # Cognition
-  "slope_moca_raw"
-)
-cor_results <- corr.test(MRS_long[, cor_vars], use = "pairwise", 
-                         method = "pearson",  adjust = "none")
-r_matrix <- cor_results$r
-p_matrix <- cor_results$p
-r_matrix
-p_matrix
-
-corrplot(r_matrix, method = "color",type = "upper",order = "hclust", 
-         hclust.method = "ward.D2", p.mat = p_matrix, sig.level = 0.05,
-         insig = "pch",     addCoef.col = "red",
-         number.cex = 0.7)
-
-
 
 
 
