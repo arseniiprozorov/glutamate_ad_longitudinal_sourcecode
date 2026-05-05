@@ -211,6 +211,9 @@ t.test(thickness_difference  ~ traj_glu_acc, data = MRS_long,
        conf.level = 0.95)
 
 
+names(MRS_long)
+
+
 ## GLM ###
 library(pROC)
 # Standard Logistic Regression - extremely high std error
@@ -249,10 +252,113 @@ exp(confint(logistic_decliners_t1glu))
 
 
 
+library(pROC)
+
+# 1. Hippocampal Volume (TIV corrected)
+logistic_decliners_hipp_e_tiv <- glm(decliners ~ t1_hipp_e_tiv, 
+                                     data = MRS_long, 
+                                     family = binomial)
+predicted_decliners_hipp_e_tiv <- predict(logistic_decliners_hipp_e_tiv, type = "response")
+summary(logistic_decliners_hipp_e_tiv)
+exp(coef(logistic_decliners_hipp_e_tiv)) 
+exp(confint(logistic_decliners_hipp_e_tiv))
+roc_hipp_e_tiv <- roc(logistic_decliners_hipp_e_tiv$y, predicted_decliners_hipp_e_tiv)
+auc(roc_hipp_e_tiv)
+ci.auc(roc_hipp_e_tiv)
+
+# 2. Cortical Thickness (Dickson)
+logistic_decliners_thick_dickson <- glm(decliners ~ t1_cortical_thickness_dickson, 
+                                        data = MRS_long, 
+                                        family = binomial)
+predicted_decliners_thick_dickson <- predict(logistic_decliners_thick_dickson, type = "response")
+summary(logistic_decliners_thick_dickson)
+exp(coef(logistic_decliners_thick_dickson)) 
+exp(confint(logistic_decliners_thick_dickson))
+roc_thick_dickson <- roc(logistic_decliners_thick_dickson$y, predicted_decliners_thick_dickson)
+auc(roc_thick_dickson)
+ci.auc(roc_thick_dickson)
+
+# 3. Superior Parietal Right Average
+logistic_decliners_par_sup_r <- glm(decliners ~ parietal_sup_r_average_t1, 
+                                    data = MRS_long, 
+                                    family = binomial)
+predicted_decliners_par_sup_r <- predict(logistic_decliners_par_sup_r, type = "response")
+summary(logistic_decliners_par_sup_r)
+exp(coef(logistic_decliners_par_sup_r)) 
+exp(confint(logistic_decliners_par_sup_r))
+roc_par_sup_r <- roc(logistic_decliners_par_sup_r$y, predicted_decliners_par_sup_r)
+auc(roc_par_sup_r)
+ci.auc(roc_par_sup_r)
+
+# 4. Hippocampus Left Average
+logistic_decliners_hipp_l_avg <- glm(decliners ~ hippocampus_l_average_t1, 
+                                     data = MRS_long, 
+                                     family = binomial)
+predicted_decliners_hipp_l_avg <- predict(logistic_decliners_hipp_l_avg, type = "response")
+summary(logistic_decliners_hipp_l_avg)
+exp(coef(logistic_decliners_hipp_l_avg)) 
+exp(confint(logistic_decliners_hipp_l_avg))
+roc_hipp_l_avg <- roc(logistic_decliners_hipp_l_avg$y, predicted_decliners_hipp_l_avg)
+auc(roc_hipp_l_avg)
+ci.auc(roc_hipp_l_avg)
+
+# 5. Hippocampus Average Activation
+logistic_decliners_hipp_act <- glm(decliners ~ hippocampus_avg_activation_t1, 
+                                   data = MRS_long, 
+                                   family = binomial)
+predicted_decliners_hipp_act <- predict(logistic_decliners_hipp_act, type = "response")
+summary(logistic_decliners_hipp_act)
+exp(coef(logistic_decliners_hipp_act)) 
+exp(confint(logistic_decliners_hipp_act))
+roc_hipp_act <- roc(logistic_decliners_hipp_act$y, predicted_decliners_hipp_act)
+auc(roc_hipp_act)
+ci.auc(roc_hipp_act)
 
 
+# Combined Structural and Functional Model
+logistic_decliners_combined_all <- glm(decliners ~ t1_hipp_e_tiv + 
+                                         t1_cortical_thickness_dickson + 
+                                         parietal_sup_r_average_t1 + 
+                                         hippocampus_l_average_t1 + 
+                                         hippocampus_avg_activation_t1,
+                                       data = MRS_long, 
+                                       family = binomial)
 
+predicted_decliners_combined_all <- predict(logistic_decliners_combined_all, type = "response")
+summary(logistic_decliners_combined_all)
+exp(coef(logistic_decliners_combined_all)) 
+exp(confint(logistic_decliners_combined_all))
 
+# ROC for the combined model
+roc_combined_all <- roc(logistic_decliners_combined_all$y, predicted_decliners_combined_all)
+auc(roc_combined_all)
+ci.auc(roc_combined_all)
+library(pROC)
+
+# 1. The Combined Model: Precuneus Glutamate + Hippocampal Volume
+logistic_decliners_final <- glm(decliners ~ t1_glu_prec + t1_hipp_e_tiv, 
+                                data = MRS_long, 
+                                family = binomial)
+
+# 2. Get Predicted Probabilities
+predicted_decliners_final <- predict(logistic_decliners_final, type = "response")
+
+# 3. View Model Summary (check if both p-values survive)
+summary(logistic_decliners_final)
+
+# 4. View Odds Ratios (to see the exact risk reduction per unit)
+exp(coef(logistic_decliners_final)) 
+exp(confint(logistic_decliners_final))
+
+# 5. Evaluate Predictive Power (ROC & AUC)
+roc_final <- roc(logistic_decliners_final$y, predicted_decliners_final)
+
+# 6. Print the AUC and 95% Confidence Interval
+auc(roc_final)
+ci.auc(roc_final)
+
+# Optional: Plot the ROC curve to visually see how good the prediction is
+plot(roc_final, main = "ROC Curve: Glutamate + Hippocampus", col = "blue", lwd = 2)
 
 
 ############## Decliners and moca slope ###################
@@ -298,6 +404,87 @@ lin_t2hipp_t1glu_acc <- lm(t2_hipp_e_tiv ~ t1_glu_acc, data = MRS_long)
 summary(lin_t2hipp_t1glu_acc)
 lin_t2thick_t1glu_prec <- lm(t2_cortical_thickness_dickson ~ t1_glu_prec, data = MRS_long)
 summary(lin_t2thick_t1glu_prec)
+
+
+# install.packages("caret")
+library(caret)
+library(pROC)
+
+# 1. Clean the data (removing NAs)
+MRS_cv_data <- MRS_long %>%
+  select(decliners, t1_glu_prec, t1_hipp_e_tiv) %>%
+  drop_na() %>%
+  mutate(decliners = factor(decliners, levels = c(0, 1), labels = c("Stable", "Decliner")))
+
+# 2. Set up Cross-Validation parameters
+# We use 10-fold CV, repeated 5 times for stability
+train_control <- trainControl(
+  method = "repeatedcv", 
+  number = 10, 
+  repeats = 5,
+  classProbs = TRUE, 
+  summaryFunction = twoClassSummary # This allows it to calculate AUC
+)
+
+# 3. Train the model using Cross-Validation
+cv_model <- train(
+  decliners ~ t1_glu_prec + t1_hipp_e_tiv, 
+  data = MRS_cv_data, 
+  method = "glm", 
+  family = "binomial",
+  trControl = train_control,
+  metric = "ROC"
+)
+
+# 4. View the results
+print(cv_model)
+# Find the threshold that maximizes both Sensitivity and Specificity (Youden's J)
+best_threshold <- coords(roc_final, "best", ret = "all", transpose = FALSE)
+print(best_threshold)
+
+install.packages(c("survival", "survminer"))
+library(survival)
+library(survminer)
+
+# 1. Create the Survival Object
+# 'age_difference' is your time; 'decliners' is your event
+surv_obj <- Surv(time = MRS_long$age_difference, event = MRS_long$decliners)
+# Simply add 'id = pscid' to the model
+cox_model <- coxph(surv_obj ~ t1_glu_prec + t1_hipp_e_tiv, 
+                   data = MRS_long, 
+                   id = pscid)
+
+summary(cox_model)
+# 2. Run the Cox Proportional Hazards Model
+# This tests how baseline glutamate and hippocampus affect the "speed" of decline
+cox_model <- coxph(surv_obj ~ t1_glu_prec + t1_hipp_e_tiv, data = MRS_long)
+
+# 3. View the Results (Hazard Ratios)
+summary(cox_model)
+
+# 4. Check the Proportional Hazards Assumption
+# This ensures the risk remains constant over the 3.5 years
+test_ph <- cox.zph(cox_model)
+print(test_ph)
+
+# 5. Visualize the "Survival" (Stability) Curves
+# We'll split glutamate into High/Low just for the visualization
+MRS_long$glu_group <- ifelse(MRS_long$t1_glu_prec > median(MRS_long$t1_glu_prec, na.rm=T), "High Glu", "Low Glu")
+fit <- survfit(Surv(age_difference, decliners) ~ glu_group, data = MRS_long)
+
+ggsurvplot(fit, data = MRS_long, 
+           pval = TRUE, 
+           conf.int = TRUE,
+           risk.table = TRUE, # Shows how many people are left at each year
+           title = "Probability of Remaining Cognitively Stable",
+           xlab = "Years of Follow-up",
+           ylab = "Probability of Stability",
+           palette = c("#E69F00", "#3B5998"))
+
+
+
+
+
 
 
 
@@ -380,6 +567,98 @@ TukeyHSD(t1_hipp_cluster)
 
 
 
+
+
+
+library(tidyr)
+library(dplyr)
+library(lme4)
+library(lmerTest)
+library(emmeans)
+
+# ==============================================================================
+# 1. DATA PREPARATION (Reshaping both regions upfront)
+# ==============================================================================
+
+# ACC Data Prep
+MRS_acc_long <- MRS_long %>%
+  mutate(
+    diagnostic_nick = factor(diagnostic_nick, levels = c("HC", "SCD+", "MCI")),
+    diagnostic_combined = case_when(
+      diagnostic_nick == "HC" ~ "HC",
+      diagnostic_nick %in% c("SCD+", "MCI") ~ "SCD+/MCI"
+    ),
+    diagnostic_combined = factor(diagnostic_combined, levels = c("HC", "SCD+/MCI")),
+    decliners_factor = factor(decliners, levels = c(0, 1), labels = c("Stable", "Declined"))
+  ) %>%
+  select(pscid, diagnostic_nick, diagnostic_combined, decliners_factor, sexe, education, 
+         t1_age, t2_age, age_difference, t1_glu_acc, t2_glu_acc) %>%
+  pivot_longer(cols = c(t1_glu_acc, t2_glu_acc), names_to = "visit", values_to = "glu_acc") %>%
+  mutate(years_elapsed = ifelse(visit == "t1_glu_acc", 0, age_difference))
+
+# Precuneus Data Prep
+MRS_prec_long <- MRS_long %>%
+  mutate(
+    diagnostic_nick = factor(diagnostic_nick, levels = c("HC", "SCD+", "MCI")),
+    diagnostic_combined = case_when(
+      diagnostic_nick == "HC" ~ "HC",
+      diagnostic_nick %in% c("SCD+", "MCI") ~ "SCD+/MCI"
+    ),
+    diagnostic_combined = factor(diagnostic_combined, levels = c("HC", "SCD+/MCI")),
+    decliners_factor = factor(decliners, levels = c(0, 1), labels = c("Stable", "Declined"))
+  ) %>%
+  select(pscid, diagnostic_nick, diagnostic_combined, decliners_factor, sexe, education, 
+         t1_age, t2_age, age_difference, t1_glu_prec, t2_glu_prec) %>%
+  pivot_longer(cols = c(t1_glu_prec, t2_glu_prec), names_to = "visit", values_to = "glu_prec") %>%
+  mutate(years_elapsed = ifelse(visit == "t1_glu_prec", 0, age_difference))
+
+
+# ==============================================================================
+# 2. ACC MODELS (Anterior Cingulate Cortex)
+# ==============================================================================
+
+# Model A: Non-Combined (3 Groups: HC, SCD+, MCI)
+model_acc_3groups <- lmer(glu_acc ~ diagnostic_nick * years_elapsed + (1 | pscid), 
+                          data = MRS_acc_long)
+summary(model_acc_3groups)
+emtrends(model_acc_3groups, ~ diagnostic_nick, var = "years_elapsed")
+
+# Model B: Combined (2 Groups: HC vs SCD+/MCI)
+model_acc_combined <- lmer(glu_acc ~ diagnostic_combined * years_elapsed + (1 | pscid), 
+                           data = MRS_acc_long)
+summary(model_acc_combined)
+emtrends(model_acc_combined, ~ diagnostic_combined, var = "years_elapsed")
+
+# Model C: Combined + Controlling for Decliner Status
+model_acc_controlled <- lmer(glu_acc ~ diagnostic_combined * years_elapsed + 
+                               decliners_factor * years_elapsed + (1 | pscid), 
+                             data = MRS_acc_long)
+summary(model_acc_controlled)
+emtrends(model_acc_controlled, ~ diagnostic_combined, var = "years_elapsed")
+
+
+# ==============================================================================
+# 3. PRECUNEUS MODELS
+# ==============================================================================
+
+# Model A: Non-Combined (3 Groups: HC, SCD+, MCI)
+model_prec_3groups <- lmer(glu_prec ~ diagnostic_nick * years_elapsed + (1 | pscid), 
+                           data = MRS_prec_long)
+summary(model_prec_3groups)
+emtrends(model_prec_3groups, ~ diagnostic_nick, var = "years_elapsed")
+
+# Model B: Combined (2 Groups: HC vs SCD+/MCI)
+model_prec_combined <- lmer(glu_prec ~ diagnostic_combined * years_elapsed + (1 | pscid), 
+                            data = MRS_prec_long)
+summary(model_prec_combined)
+emtrends(model_prec_combined, ~ diagnostic_combined, var = "years_elapsed")
+
+# Model C: Combined + Controlling for Decliner Status
+model_prec_controlled <- lmer(glu_prec ~ diagnostic_combined * years_elapsed + 
+                                decliners_factor * years_elapsed + (1 | pscid), 
+                              data = MRS_prec_long)
+summary(model_prec_controlled)
+emtrends(model_prec_controlled, ~ diagnostic_combined, var = "years_elapsed")
 
 
 
