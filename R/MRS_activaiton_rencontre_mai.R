@@ -237,16 +237,19 @@ acc_stats <- emtrends(lmm_acc, ~ diagnostic_nick, var = "years_elapsed")
 summary(acc_stats, infer = TRUE)
 
 
-
+names(MRS_long)
 ### Regression
+## Structure
+summary(lm(t2_hipp_e_tiv ~ t1_glu_prec, data = MRS_long))
+summary(lm(t2_hipp_e_tiv ~ t1_glu_acc, data = MRS_long))
+summary(lm(t2_cortical_thickness_dickson ~  t1_glu_prec, data = MRS_long))
+summary(lm(t2_cortical_thickness_dickson  ~  t1_glu_acc, data = MRS_long))
+
+## Activation
 names(MRS_long)
 MRS_long$hipp_l_diff_activation <- ((MRS_long$hippocampus_l_average_t2 - MRS_long$hippocampus_l_average_t1)/MRS_long$hippocampus_l_average_t1)/MRS_long$age_difference
 MRS_long$hipp_l_diff_activation <- winsorize_iqr(MRS_long$hipp_l_diff_activation, 1.5)
 
-
-summary(lm(hipp_diff_activation ~ t1_glu_acc, data = MRS_long))
-summary(lm(hipp_l_diff_activation ~ t1_glu_prec + t1_age, data = MRS_long))
-summary(lm(hipp_l_diff_activation ~ t1_glu_acc, data = MRS_long))
 
 summary(lm(hipp_l_diff_activation ~ t1_glu_prec, data = MRS_long))
 summary(lm(hipp_l_diff_activation ~ t1_glu_acc, data = MRS_long))
@@ -254,11 +257,71 @@ summary(lm(parietal_sup_l_diff ~ t1_glu_prec, data = MRS_long))
 summary(lm(parietal_sup_l_diff ~ t1_glu_acc, data = MRS_long))
 
 
+## Cognition
+summary(lm(slope_moca_scaled ~ t1_glu_prec, data = MRS_long))
+summary(lm(slope_moca_scaled ~ t1_glu_acc, data = MRS_long))
+summary(lm(slope_moca_scaled ~ t1_glu_prec + I(t1_glu_prec^2), data = MRS_long))
+summary(lm(slope_moca_scaled ~ t1_glu_acc + I(t1_glu_acc^2), data = MRS_long))
 
-summary(lm(hipp_l_diff_activation ~ hipp_difference + I(hipp_difference^2), data = MRS_long))
-summary(lm(hipp_l_diff_activation ~ thickness_difference + I(thickness_difference^2), data = MRS_long))
-summary(lm(hipp_difference ~  hipp_l_diff_activation  + I(hipp_l_diff_activation^2), data = MRS_long))
-summary(lm(thickness_difference  ~  hipp_l_diff_activation + I(hipp_l_diff_activation^2), data = MRS_long))
+
+
+## Between themselves
+summary(lm(slope_moca_raw ~ hipp_l_diff_activation, data = MRS_long))
+summary(lm(slope_moca_raw ~ hipp_l_diff_activation, data = MRS_long))
+summary(lm(t2_hipp_e_tiv ~ hipp_l_diff_activation, data = MRS_long))
+summary(lm(t2_cortical_thickness_dickson ~ hipp_l_diff_activation, data = MRS_long))
+
+## Mediation
+library(mediation)
+library(lavaan)
+# Center 
+MRS_long$t1_glu_acc_c <- as.numeric(scale(MRS_long$t1_glu_acc, scale = FALSE))
+
+sem_linear_model_acc <- 't2_hipp_e_tiv ~ a1 * t1_glu_acc_c
+  slope_moca_scaled ~ cp1 * t1_glu_acc_c + b1 * t2_hipp_e_tiv
+ind_eff := a1* b1'
+
+fit_sem_lin_acc <- sem(sem_linear_model_acc,data = MRS_long, missing = "fiml",
+                                 fixed.x   = FALSE, estimator = "MLR")
+
+summary(fit_sem_lin_acc, standardized = TRUE, ci = TRUE)
+parameterEstimates(fit_sem_lin_acc, standardized = TRUE, ci = TRUE)
+
+
+## Sensirivity bootstrap 
+fit_sem_lin_acc_boot <- sem(sem_linear_model_acc,data = MRS_long,missing = "fiml",
+  fixed.x = FALSE,estimator = "ML",se = "bootstrap",bootstrap = 5000)
+
+
+
+## precuneus
+MRS_long$t1_glu_prec_c <- as.numeric(scale(MRS_long$t1_glu_prec, scale = FALSE))
+
+sem_linear_model_prec <- 't2_hipp_e_tiv ~ a1 * t1_glu_prec_c
+slope_moca_scaled ~ cp1 * t1_glu_prec_c + b1  * t2_hipp_e_tiv
+  ind_structural := a1 * b1'
+
+fit_sem_lin_prec <- sem(sem_linear_model_prec,data      = MRS_long,
+  missing   = "fiml",fixed.x   = FALSE,estimator = "MLR")
+
+summary(fit_sem_lin_prec, standardized = TRUE, ci = TRUE)
+parameterEstimates(fit_sem_lin_prec, standardized = TRUE, ci = TRUE)
+
+
+
+## Precuneus quadratic 
+MRS_long$t1_glu_prec_c2 <- MRS_long$t1_glu_prec_c^2
+
+sem_quadratic_model_prec <- 't2_hipp_e_tiv ~ a1 * t1_glu_prec_c
+  slope_moca_scaled ~ cp1 * t1_glu_prec_c +cp2 * t1_glu_prec_c2 + b1  * t2_hipp_e_tiv
+  ind_structural := a1 * b1'
+
+fit_sem_quad_prec <- sem(sem_quadratic_model_prec,data      = MRS_long,
+  missing   = "fiml",fixed.x   = FALSE,estimator = "MLR")
+
+summary(fit_sem_quad_prec, standardized = TRUE, ci = TRUE)
+parameterEstimates(fit_sem_quad_prec, standardized = TRUE, ci = TRUE)
+
 
 
 
