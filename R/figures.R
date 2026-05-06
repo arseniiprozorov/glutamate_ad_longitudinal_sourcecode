@@ -694,28 +694,98 @@ legend("bottomright",
 
 
 
-# 1. Create Precuneus Tertiles
-tertiles_prec <- quantile(MRS_long$t1_glu_prec, probs = seq(0, 1, 1/3), na.rm = TRUE)
-MRS_long$Prec_Tertile <- cut(MRS_long$t1_glu_prec, breaks = tertiles_prec, 
-                             labels = c("Low", "Medium", "High"), include.lowest = TRUE)
+# Install these if you haven't already: 
+# install.packages(c("survival", "survminer", "dplyr"))
 
-# 2. Re-run the Winning Model (Model 1) using Tertiles
-cox_3var_winning <- coxph(Surv(age_change_moca, decliners_numeric) ~ Prec_Tertile + t1_hipp_e_tiv + parietal_sup_l_average_t1, data = MRS_long)
+library(survival)
+library(survminer)
+library(dplyr)
 
-# 3. Create prediction data (fixing Hip Vol and Parietal to their means)
-new_df_prec <- data.frame(
-  Prec_Tertile = levels(MRS_long$Prec_Tertile),
-  t1_hipp_e_tiv = mean(MRS_long$t1_hipp_e_tiv, na.rm = TRUE),
-  parietal_sup_l_average_t1 = mean(MRS_long$parietal_sup_l_average_t1, na.rm = TRUE)
+# 1. Categorize the continuous precuneus glutamate variable into tertiles
+# This creates the distinct "Low", "Medium", and "High" groups for the plot
+MRS_long <- MRS_long %>%
+  mutate(
+    glu_tertile = ntile(t1_glu_prec, 3),
+    glu_strata = case_when(
+      glu_tertile == 1 ~ "Low Prec Glu",
+      glu_tertile == 2 ~ "Medium Prec Glu",
+      glu_tertile == 3 ~ "High Prec Glu"
+    ),
+    # Convert to a factor to ensure the legend displays in the correct order
+    glu_strata = factor(glu_strata, levels = c("Low Prec Glu", "Medium Prec Glu", "High Prec Glu"))
+  )
+
+# 2. Fit the survival curve specifically for plotting
+# Note: We use survfit here to generate the survival probabilities for the plot
+fit_plot <- survfit(Surv(age_change_moca, decliners_numeric) ~ glu_strata, data = MRS_long)
+
+# 3. Generate the graph using ggsurvplot
+ggsurvplot(
+  fit_plot,
+  data = MRS_long,
+  conf.int = TRUE,          # Adds the shaded confidence intervals
+  conf.int.alpha = 0.3,     # Adjusts the transparency of the shading
+  censor = TRUE,            # Adds the '+' censor marks for stability
+  censor.shape = 43,        # Sets censor shape to the standard '+'
+  censor.size = 4.5,
+  # Approximating the orange, grey, and blue color palette from your image
+  palette = c("#FDB863", "#999999", "#56B4E9"), 
+  title = "",
+  xlab = "Years",
+  ylab = "Probability of Stability",
+  legend.title = "",
+  legend = "top",
+  ggtheme = theme_minimal() # Provides the clean, white grid background
 )
 
-# 4. Fit and Plot
-fit_adj_prec <- survfit(cox_3var_winning, newdata = new_df_prec)
 
-ggsurvplot(fit_adj_prec, 
-           data = new_df_prec, 
-           legend.labs = c("Low Prec Glu", "Medium Prec Glu", "High Prec Glu"),
-           palette = c("#ff7f0e", "#7f7f7f", "#1f77b4"),
-           title = "Adjusted Survival: Precuneus (Corrected for Structure & Activation)",
-           xlab = "Years", ylab = "Probability of Stability",
-           ggtheme = theme_minimal())
+
+
+
+
+
+
+
+
+
+
+
+
+library(survival)
+library(survminer)
+library(dplyr)
+
+# 1. Categorize the continuous ACC glutamate variable into tertiles
+MRS_long <- MRS_long %>%
+  mutate(
+    glu_tertile = ntile(t1_glu_acc, 3),
+    glu_strata = case_when(
+      glu_tertile == 1 ~ "Low ACC Glu",
+      glu_tertile == 2 ~ "Medium ACC Glu",
+      glu_tertile == 3 ~ "High ACC Glu"
+    ),
+    # CORRECTED: The levels now perfectly match the strings from case_when above
+    glu_strata = factor(glu_strata, levels = c("Low ACC Glu", "Medium ACC Glu", "High ACC Glu"))
+  )
+
+# 2. Fit the survival curve specifically for plotting
+fit_plot <- survfit(Surv(age_change_moca, decliners_numeric) ~ glu_strata, data = MRS_long)
+
+# 3. Generate the graph using ggsurvplot
+ggsurvplot(
+  fit_plot,
+  data = MRS_long,
+  conf.int = TRUE,          
+  conf.int.alpha = 0.3,     
+  censor = TRUE,            
+  censor.shape = 43,        
+  censor.size = 4.5,
+  palette = c("#FDB863", "#999999", "#56B4E9"), 
+  # UPDATED TITLE: Reflects the shift to the Anterior Cingulate
+  title = "",
+  xlab = "Years",
+  ylab = "Probability of Stability",
+  legend.title = "Strata",
+  legend = "top",
+  ggtheme = theme_minimal() 
+)

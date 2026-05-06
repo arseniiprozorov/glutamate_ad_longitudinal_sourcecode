@@ -396,6 +396,7 @@ coords(roc_metab_struc_thick, "best", ret=c("threshold", "specificity", "sensiti
 
 
 
+
 ## Combined models (3 variables )
 
 model_3var_1 <- glm(decliners ~ t1_glu_prec + t1_hipp_e_tiv + parietal_sup_l_average_t1, data = MRS_long, family = "binomial")
@@ -434,6 +435,11 @@ summary(cox_metab_func)
 
 
 
+# Cox model
+cox_metab_func <- coxph(Surv(age_change_moca, decliners_numeric) ~ t1_glu_prec, data = MRS_long)
+
+# 3. View the results
+summary(cox_metab_func)
 
 
 
@@ -441,79 +447,4 @@ summary(cox_metab_func)
 
 
 
-
-
-
-library(survival)
-
-# Ensure the event variable is strictly numeric
-MRS_long$decliners_numeric <- as.numeric(as.character(MRS_long$decliners))
-
-# ====================================================================
-# 1-VARIABLE MODELS
-# ====================================================================
-cox_glu_prec    <- coxph(Surv(age_change_moca, decliners_numeric) ~ t1_glu_prec, data = MRS_long)
-cox_glu_acc     <- coxph(Surv(age_change_moca, decliners_numeric) ~ t1_glu_acc, data = MRS_long)
-cox_struc_hip   <- coxph(Surv(age_change_moca, decliners_numeric) ~ t1_hipp_e_tiv, data = MRS_long)
-cox_struc_thick <- coxph(Surv(age_change_moca, decliners_numeric) ~ t1_cortical_thickness_dickson, data = MRS_long)
-cox_func_hip    <- coxph(Surv(age_change_moca, decliners_numeric) ~ hippocampus_l_average_t1, data = MRS_long)
-cox_func_par    <- coxph(Surv(age_change_moca, decliners_numeric) ~ parietal_sup_l_average_t1, data = MRS_long)
-
-# ====================================================================
-# 2-VARIABLE MODELS
-# ====================================================================
-cox_metab_func        <- coxph(Surv(age_change_moca, decliners_numeric) ~ t1_glu_acc + parietal_sup_l_average_t1, data = MRS_long)
-cox_metab_struc_hip   <- coxph(Surv(age_change_moca, decliners_numeric) ~ t1_glu_prec + t1_hipp_e_tiv, data = MRS_long)
-cox_metab_struc_thick <- coxph(Surv(age_change_moca, decliners_numeric) ~ t1_glu_prec + t1_cortical_thickness_dickson, data = MRS_long)
-
-# ====================================================================
-# 3-VARIABLE MODELS
-# ====================================================================
-cox_3var_1 <- coxph(Surv(age_change_moca, decliners_numeric) ~ t1_glu_prec + t1_hipp_e_tiv + parietal_sup_l_average_t1, data = MRS_long)
-cox_3var_2 <- coxph(Surv(age_change_moca, decliners_numeric) ~ t1_glu_prec + t1_glu_acc + parietal_sup_l_average_t1, data = MRS_long)
-cox_3var_3 <- coxph(Surv(age_change_moca, decliners_numeric) ~ t1_hipp_e_tiv + hippocampus_l_average_t1 + parietal_sup_l_average_t1, data = MRS_long)
-
-# ====================================================================
-# EXTRACT METRICS AND COMPARE
-# ====================================================================
-
-# Put all models into a named list
-all_cox_models <- list(
-  "Glu Prec" = cox_glu_prec,
-  "Glu ACC" = cox_glu_acc,
-  "Hip Vol" = cox_struc_hip,
-  "Thickness" = cox_struc_thick,
-  "Hip Act" = cox_func_hip,
-  "Par Act" = cox_func_par,
-  "Glu ACC + Par Act (2 Var)" = cox_metab_func,
-  "Glu Prec + Hip Vol (2 Var)" = cox_metab_struc_hip,
-  "Glu Prec + Thickness (2 Var)" = cox_metab_struc_thick,
-  "Prec + HipVol + ParAct (3 Var)" = cox_3var_1,
-  "Prec + ACC + ParAct (3 Var)" = cox_3var_2,
-  "HipVol + HipAct + ParAct (3 Var)" = cox_3var_3
-)
-
-# Function to extract Concordance, AIC, and Overall P-value
-get_cox_metrics <- function(model, name) {
-  c_index <- model$concordance["concordance"]
-  aic_val <- extractAIC(model)[2]
-  p_val <- summary(model)$logtest["pvalue"]
-  
-  data.frame(
-    Model = name,
-    C_Index = round(c_index, 3), # Higher is better
-    AIC = round(aic_val, 1),     # Lower is better
-    Overall_P = signif(p_val, 3) # Lower is better
-  )
-}
-
-# Combine into a table and sort by highest Concordance
-cox_results_table <- do.call(rbind, mapply(get_cox_metrics, all_cox_models, names(all_cox_models), SIMPLIFY = FALSE))
-cox_results_table <- cox_results_table[order(-cox_results_table$C_Index), ]
-
-# Remove rownames for cleaner printing
-rownames(cox_results_table) <- NULL
-
-# View the final table
-print(cox_results_table)
 
