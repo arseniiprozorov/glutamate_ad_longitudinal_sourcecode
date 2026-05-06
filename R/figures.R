@@ -566,3 +566,156 @@ ggplot(plot_data_t1, aes(x = t1_glutamate, y = hipp_l_diff_activation)) +
   theme_minimal() +
   theme(panel.grid.minor = element_blank())
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+### ROC curves 
+
+library(pROC)
+
+# Set up the plotting area
+# We start by plotting the strongest individual predictor (Cortical Thickness)
+plot(roc_struc_thick, 
+     col = "#1f77b4", # Professional Blue
+     lwd = 3, 
+     main = "ROC Curves: Significant Predictors of Cognitive Decline",
+     xlab = "1 - Specificity", 
+     ylab = "Sensitivity",
+     legacy.axes = TRUE) # This ensures the x-axis is 0 to 1 (1-Specificity)
+
+# Add the other three significant models
+plot(roc_struc_hip, add = TRUE, col = "#ff7f0e", lwd = 3)    # Orange
+plot(roc_glu_prec, add = TRUE, col = "#2ca02c", lwd = 3)     # Green
+plot(roc_glu_acc, add = TRUE, col = "#d62728", lwd = 3)      # Red
+
+# Add a reference line (chance level)
+abline(a = 0, b = 1, lty = 2, col = "darkgrey")
+
+# Add a legend with AUC values for clarity
+legend("bottomright", 
+       legend = c(
+         paste0("Cortical Thickness (AUC = ", round(auc(roc_struc_thick), 3), ")"),
+         paste0("Hippocampal Volume (AUC = ", round(auc(roc_struc_hip), 3), ")"),
+         paste0("Precuneus Glutamate (AUC = ", round(auc(roc_glu_prec), 3), ")"),
+         paste0("ACC Glutamate (AUC = ", round(auc(roc_glu_acc), 3), ")")
+       ),
+       col = c("#1f77b4", "#ff7f0e", "#2ca02c", "#d62728"), 
+       lwd = 3, 
+       cex = 0.8, 
+       bty = "n") # Removes the box around the legend
+
+
+
+
+## Combined models 2 variables 
+
+# Set up the plotting area with your top-performing model
+# Metab (ACC) + Func (Parietal)
+plot(roc_metab_func, 
+     col = "#1f77b4", # Professional Blue
+     lwd = 3, 
+     main = "Multimodal ROC Curves: Top 2-Variable Predictors",
+     xlab = "1 - Specificity", 
+     ylab = "Sensitivity",
+     legacy.axes = TRUE) # Standard 0 to 1 axis
+
+# Add the other two winning models
+plot(roc_metab_struc_hip, add = TRUE, col = "#ff7f0e", lwd = 3)    # Orange
+plot(roc_metab_struc_thick, add = TRUE, col = "#2ca02c", lwd = 3)  # Green
+
+# Add a reference line (chance level)
+abline(a = 0, b = 1, lty = 2, col = "darkgrey")
+
+# Add a professional legend
+legend("bottomright", 
+       legend = c(
+         paste0("Glu ACC + Parietal L Activaiton (AUC = ", round(auc(roc_metab_func), 3), ")"),
+         paste0("Glu Precuneus + Hip Vol (AUC = ", round(auc(roc_metab_struc_hip), 3), ")"),
+         paste0("Glu Precuneus + Thickness (AUC = ", round(auc(roc_metab_struc_thick), 3), ")")
+       ),
+       col = c("#1f77b4", "#ff7f0e", "#2ca02c"), 
+       lwd = 3, 
+       cex = 0.75, 
+       bty = "n")
+
+
+
+
+## 3 variables 
+library(pROC)
+
+# Set up the plotting area with the top-performing 3-variable model
+# Model 1: Metab + Struc + Func (AUC = 0.784)
+plot(roc_3var_1, 
+     col = "#1f77b4", # Professional Blue
+     lwd = 3, 
+     main = "Exploratory Multimodal ROC Curves: 3-Variable Predictors",
+     xlab = "1 - Specificity", 
+     ylab = "Sensitivity",
+     legacy.axes = TRUE) # Standard 0 to 1 axis
+
+# Add the other two winning models
+# Model 2: Metab(x2) + Func (AUC = 0.771)
+plot(roc_3var_2, add = TRUE, col = "#ff7f0e", lwd = 3)    # Orange
+
+# Model 3: Struc + Func(x2) (AUC = 0.767)
+plot(roc_3var_3, add = TRUE, col = "#2ca02c", lwd = 3)    # Green
+
+# Add a reference line (chance level)
+abline(a = 0, b = 1, lty = 2, col = "darkgrey")
+
+# Add a professional legend
+legend("bottomright", 
+       legend = c(
+         paste0("Glu Prec + Hip Vol + Parietal Act (AUC = ", round(auc(roc_3var_1), 3), ")"),
+         paste0("Glu Prec + Glu ACC + Parietal Act (AUC = ", round(auc(roc_3var_2), 3), ")"),
+         paste0("Hip Vol + Hip Act + Parietal Act (AUC = ", round(auc(roc_3var_3), 3), ")")
+       ),
+       col = c("#1f77b4", "#ff7f0e", "#2ca02c"), 
+       lwd = 3, 
+       cex = 0.75, 
+       bty = "n") # Removes the box around the legend
+
+
+
+
+
+
+
+
+
+# 1. Create Precuneus Tertiles
+tertiles_prec <- quantile(MRS_long$t1_glu_prec, probs = seq(0, 1, 1/3), na.rm = TRUE)
+MRS_long$Prec_Tertile <- cut(MRS_long$t1_glu_prec, breaks = tertiles_prec, 
+                             labels = c("Low", "Medium", "High"), include.lowest = TRUE)
+
+# 2. Re-run the Winning Model (Model 1) using Tertiles
+cox_3var_winning <- coxph(Surv(age_change_moca, decliners_numeric) ~ Prec_Tertile + t1_hipp_e_tiv + parietal_sup_l_average_t1, data = MRS_long)
+
+# 3. Create prediction data (fixing Hip Vol and Parietal to their means)
+new_df_prec <- data.frame(
+  Prec_Tertile = levels(MRS_long$Prec_Tertile),
+  t1_hipp_e_tiv = mean(MRS_long$t1_hipp_e_tiv, na.rm = TRUE),
+  parietal_sup_l_average_t1 = mean(MRS_long$parietal_sup_l_average_t1, na.rm = TRUE)
+)
+
+# 4. Fit and Plot
+fit_adj_prec <- survfit(cox_3var_winning, newdata = new_df_prec)
+
+ggsurvplot(fit_adj_prec, 
+           data = new_df_prec, 
+           legend.labs = c("Low Prec Glu", "Medium Prec Glu", "High Prec Glu"),
+           palette = c("#ff7f0e", "#7f7f7f", "#1f77b4"),
+           title = "Adjusted Survival: Precuneus (Corrected for Structure & Activation)",
+           xlab = "Years", ylab = "Probability of Stability",
+           ggtheme = theme_minimal())

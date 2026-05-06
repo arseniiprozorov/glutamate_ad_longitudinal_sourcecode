@@ -106,6 +106,8 @@ MRS_long$precuneus_diff <- winsorize_iqr(MRS_long$precuneus_diff, 1.5)
 MRS_long$acc_t1_avg_activation <- winsorize_iqr(MRS_long$acc_t1_avg_activation, 1.5)
 MRS_long$acc_t2_avg_activation <- winsorize_iqr(MRS_long$acc_t2_avg_activation, 1.5)
 MRS_long$acc_diff <- winsorize_iqr(MRS_long$acc_diff, 1.5)
+MRS_long$hipp_l_diff_activation <- ((MRS_long$hippocampus_l_average_t2 - MRS_long$hippocampus_l_average_t1)/MRS_long$hippocampus_l_average_t1)/MRS_long$age_difference
+MRS_long$hipp_l_diff_activation <- winsorize_iqr(MRS_long$hipp_l_diff_activation, 1.5)
 
 
 
@@ -247,8 +249,6 @@ summary(lm(t2_cortical_thickness_dickson  ~  t1_glu_acc, data = MRS_long))
 
 ## Activation
 names(MRS_long)
-MRS_long$hipp_l_diff_activation <- ((MRS_long$hippocampus_l_average_t2 - MRS_long$hippocampus_l_average_t1)/MRS_long$hippocampus_l_average_t1)/MRS_long$age_difference
-MRS_long$hipp_l_diff_activation <- winsorize_iqr(MRS_long$hipp_l_diff_activation, 1.5)
 
 
 summary(lm(hipp_l_diff_activation ~ t1_glu_prec, data = MRS_long))
@@ -325,6 +325,195 @@ parameterEstimates(fit_sem_quad_prec, standardized = TRUE, ci = TRUE)
 
 
 
+############ Logistic regressions
+library(pROC)
+
+# Precuneus GLutamate
+model_glu_prec <- glm(decliners ~ t1_glu_prec, data = MRS_long, family = "binomial")
+summary(model_glu_prec)
+roc_glu_prec <- roc(model_glu_prec$y, fitted(model_glu_prec))
+auc(roc_glu_prec)
+coords(roc_glu_prec, "best", ret=c("threshold", "specificity", "sensitivity"), best.method="youden")
+
+# ACC Glutamate
+model_glu_acc <- glm(decliners ~ t1_glu_acc, data = MRS_long, family = "binomial")
+summary(model_glu_acc)
+roc_glu_acc <- roc(model_glu_acc$y, fitted(model_glu_acc))
+auc(roc_glu_acc)
+coords(roc_glu_acc, "best", ret=c("threshold", "specificity", "sensitivity"), best.method="youden")
+
+# Hippocampal Volume
+model_struc_hip <- glm(decliners ~ t1_hipp_e_tiv, data = MRS_long, family = "binomial")
+summary(model_struc_hip)
+roc_struc_hip <- roc(model_struc_hip$y, fitted(model_struc_hip))
+auc(roc_struc_hip)
+coords(roc_struc_hip, "best", ret=c("threshold", "specificity", "sensitivity"), best.method="youden")
+
+# Cortical Thickness
+model_struc_thick <- glm(decliners ~ t1_cortical_thickness_dickson, data = MRS_long, family = "binomial")
+summary(model_struc_thick)
+roc_struc_thick <- roc(model_struc_thick$y, fitted(model_struc_thick))
+auc(roc_struc_thick)
+coords(roc_struc_thick, "best", ret=c("threshold", "specificity", "sensitivity"), best.method="youden")
+
+# Hippocampal Activation
+model_func_hip <- glm(decliners ~ hippocampus_l_average_t1, data = MRS_long, family = "binomial")
+summary(model_func_hip)
+roc_func_hip <- roc(model_func_hip$y, fitted(model_func_hip))
+auc(roc_func_hip)
+coords(roc_func_hip, "best", ret=c("threshold", "specificity", "sensitivity"), best.method="youden")
+
+# Superior Parietal Activation
+model_func_par <- glm(decliners ~ parietal_sup_l_average_t1, data = MRS_long, family = "binomial")
+summary(model_func_par)
+roc_func_par <- roc(model_func_par$y, fitted(model_func_par))
+auc(roc_func_par)
+coords(roc_func_par, "best", ret=c("threshold", "specificity", "sensitivity"), best.method="youden")
 
 
+## Combined Models (2 variables)
+
+#  Glu acc + parietal activaiton 
+model_metab_func <- glm(decliners ~ t1_glu_acc + parietal_sup_l_average_t1, data = MRS_long, family = "binomial")
+summary(model_metab_func)
+roc_metab_func <- roc(model_metab_func$y, fitted(model_metab_func))
+auc(roc_metab_func)
+coords(roc_metab_func, "best", ret=c("threshold", "specificity", "sensitivity"), best.method="youden")
+
+# Glu precuneus  + Hipp volume 
+model_metab_struc_hip <- glm(decliners ~ t1_glu_prec + t1_hipp_e_tiv, data = MRS_long, family = "binomial")
+summary(model_metab_struc_hip)
+roc_metab_struc_hip <- roc(model_metab_struc_hip$y, fitted(model_metab_struc_hip))
+auc(roc_metab_struc_hip)
+coords(roc_metab_struc_hip, "best", ret=c("threshold", "specificity", "sensitivity"), best.method="youden")
+
+# Glu precuneus + cortical thickness 
+model_metab_struc_thick <- glm(decliners ~ t1_glu_prec + t1_cortical_thickness_dickson, data = MRS_long, family = "binomial")
+summary(model_metab_struc_thick)
+roc_metab_struc_thick <- roc(model_metab_struc_thick$y, fitted(model_metab_struc_thick))
+auc(roc_metab_struc_thick)
+coords(roc_metab_struc_thick, "best", ret=c("threshold", "specificity", "sensitivity"), best.method="youden")
+
+
+
+## Combined models (3 variables )
+
+model_3var_1 <- glm(decliners ~ t1_glu_prec + t1_hipp_e_tiv + parietal_sup_l_average_t1, data = MRS_long, family = "binomial")
+summary(model_3var_1)
+roc_3var_1 <- roc(model_3var_1$y, fitted(model_3var_1))
+auc(roc_3var_1)
+coords(roc_3var_1, "best", ret=c("threshold", "specificity", "sensitivity"), best.method="youden")
+
+
+model_3var_2 <- glm(decliners ~ t1_glu_prec + t1_glu_acc + parietal_sup_l_average_t1, data = MRS_long, family = "binomial")
+summary(model_3var_2)
+roc_3var_2 <- roc(model_3var_2$y, fitted(model_3var_2))
+auc(roc_3var_2)
+coords(roc_3var_2, "best", ret=c("threshold", "specificity", "sensitivity"), best.method="youden")
+
+model_3var_3 <- glm(decliners ~ t1_hipp_e_tiv + hippocampus_l_average_t1 + parietal_sup_l_average_t1, data = MRS_long, family = "binomial")
+summary(model_3var_3)
+roc_3var_3 <- roc(model_3var_3$y, fitted(model_3var_3))
+auc(roc_3var_3)
+coords(roc_3var_3, "best", ret=c("threshold", "specificity", "sensitivity"), best.method="youden")
+
+
+
+
+### Survival analysis
+library(survival)
+library(survminer)
+
+MRS_long$decliners_numeric <- as.numeric(as.character(MRS_long$decliners))
+
+# Cox model
+cox_metab_func <- coxph(Surv(age_change_moca, decliners_numeric) ~ t1_glu_acc + parietal_sup_l_average_t1, data = MRS_long)
+
+# 3. View the results
+summary(cox_metab_func)
+
+
+
+
+
+
+
+
+
+
+
+
+
+library(survival)
+
+# Ensure the event variable is strictly numeric
+MRS_long$decliners_numeric <- as.numeric(as.character(MRS_long$decliners))
+
+# ====================================================================
+# 1-VARIABLE MODELS
+# ====================================================================
+cox_glu_prec    <- coxph(Surv(age_change_moca, decliners_numeric) ~ t1_glu_prec, data = MRS_long)
+cox_glu_acc     <- coxph(Surv(age_change_moca, decliners_numeric) ~ t1_glu_acc, data = MRS_long)
+cox_struc_hip   <- coxph(Surv(age_change_moca, decliners_numeric) ~ t1_hipp_e_tiv, data = MRS_long)
+cox_struc_thick <- coxph(Surv(age_change_moca, decliners_numeric) ~ t1_cortical_thickness_dickson, data = MRS_long)
+cox_func_hip    <- coxph(Surv(age_change_moca, decliners_numeric) ~ hippocampus_l_average_t1, data = MRS_long)
+cox_func_par    <- coxph(Surv(age_change_moca, decliners_numeric) ~ parietal_sup_l_average_t1, data = MRS_long)
+
+# ====================================================================
+# 2-VARIABLE MODELS
+# ====================================================================
+cox_metab_func        <- coxph(Surv(age_change_moca, decliners_numeric) ~ t1_glu_acc + parietal_sup_l_average_t1, data = MRS_long)
+cox_metab_struc_hip   <- coxph(Surv(age_change_moca, decliners_numeric) ~ t1_glu_prec + t1_hipp_e_tiv, data = MRS_long)
+cox_metab_struc_thick <- coxph(Surv(age_change_moca, decliners_numeric) ~ t1_glu_prec + t1_cortical_thickness_dickson, data = MRS_long)
+
+# ====================================================================
+# 3-VARIABLE MODELS
+# ====================================================================
+cox_3var_1 <- coxph(Surv(age_change_moca, decliners_numeric) ~ t1_glu_prec + t1_hipp_e_tiv + parietal_sup_l_average_t1, data = MRS_long)
+cox_3var_2 <- coxph(Surv(age_change_moca, decliners_numeric) ~ t1_glu_prec + t1_glu_acc + parietal_sup_l_average_t1, data = MRS_long)
+cox_3var_3 <- coxph(Surv(age_change_moca, decliners_numeric) ~ t1_hipp_e_tiv + hippocampus_l_average_t1 + parietal_sup_l_average_t1, data = MRS_long)
+
+# ====================================================================
+# EXTRACT METRICS AND COMPARE
+# ====================================================================
+
+# Put all models into a named list
+all_cox_models <- list(
+  "Glu Prec" = cox_glu_prec,
+  "Glu ACC" = cox_glu_acc,
+  "Hip Vol" = cox_struc_hip,
+  "Thickness" = cox_struc_thick,
+  "Hip Act" = cox_func_hip,
+  "Par Act" = cox_func_par,
+  "Glu ACC + Par Act (2 Var)" = cox_metab_func,
+  "Glu Prec + Hip Vol (2 Var)" = cox_metab_struc_hip,
+  "Glu Prec + Thickness (2 Var)" = cox_metab_struc_thick,
+  "Prec + HipVol + ParAct (3 Var)" = cox_3var_1,
+  "Prec + ACC + ParAct (3 Var)" = cox_3var_2,
+  "HipVol + HipAct + ParAct (3 Var)" = cox_3var_3
+)
+
+# Function to extract Concordance, AIC, and Overall P-value
+get_cox_metrics <- function(model, name) {
+  c_index <- model$concordance["concordance"]
+  aic_val <- extractAIC(model)[2]
+  p_val <- summary(model)$logtest["pvalue"]
+  
+  data.frame(
+    Model = name,
+    C_Index = round(c_index, 3), # Higher is better
+    AIC = round(aic_val, 1),     # Lower is better
+    Overall_P = signif(p_val, 3) # Lower is better
+  )
+}
+
+# Combine into a table and sort by highest Concordance
+cox_results_table <- do.call(rbind, mapply(get_cox_metrics, all_cox_models, names(all_cox_models), SIMPLIFY = FALSE))
+cox_results_table <- cox_results_table[order(-cox_results_table$C_Index), ]
+
+# Remove rownames for cleaner printing
+rownames(cox_results_table) <- NULL
+
+# View the final table
+print(cox_results_table)
 
