@@ -239,6 +239,42 @@ acc_stats <- emtrends(lmm_acc, ~ diagnostic_nick, var = "years_elapsed")
 summary(acc_stats, infer = TRUE)
 
 
+
+# Quadratic shape
+# center the time variable
+MRS_prec_long$years_elapsed_c <- MRS_prec_long$years_elapsed - mean(MRS_prec_long$years_elapsed, na.rm = TRUE)
+MRS_acc_long$years_elapsed_c <- MRS_acc_long$years_elapsed - mean(MRS_acc_long$years_elapsed, na.rm = TRUE)
+
+library(lme4)
+library(lmerTest) 
+
+lmm_prec_quad <- lmer(glutamate_prec ~ years_elapsed_c + I(years_elapsed_c^2) + t1_age +
+                        (1 | pscid), 
+                      data = MRS_prec_long)
+
+summary(lmm_prec_quad)
+
+lmm_acc_quad <- lmer(glutamate_acc ~ years_elapsed_c + I(years_elapsed_c^2) + t1_age +
+                        (1 | pscid), 
+                      data = MRS_acc_long)
+
+summary(lmm_acc_quad)
+
+
+
+lmm_parietal_quad <- lmer(glutamate_prec ~ years_elapsed_c + I(years_elapsed_c^2) + t1_age +
+                        (1 | pscid), 
+                      data = MRS_prec_long)
+
+summary(lmm_prec_quad)
+
+lmm_acc_quad <- lmer(glutamate_acc ~ years_elapsed_c + I(years_elapsed_c^2) + t1_age +
+                       (1 | pscid), 
+                     data = MRS_acc_long)
+
+summary(lmm_acc_quad)
+
+
 names(MRS_long)
 ### Regression
 ## Structure
@@ -440,8 +476,6 @@ cox_metab_func <- coxph(Surv(age_change_moca, decliners_numeric) ~ t1_glu_prec, 
 
 # 3. View the results
 summary(cox_metab_func)
-
-
 
 
 
