@@ -10,7 +10,7 @@ library(emmeans)
 #ANALYSES PRÉLIMINAIRES :
 #Création d’une banque de données
 
-X2026_05_02_glu_moca_struc_func <- read_excel("C:/Users/okkam/Desktop/labo/article 2/Longitudinal_Multimodal_Data_CIMAQ/2026-05-02_glu_moca_struc_func.xlsx")
+X2026_05_02_glu_moca_struc_func <- read_excel("C:\\Users\\okkam\\Desktop\\labo\\article 2\\Longitudinal_Multimodal_Data_CIMAQ\\2026-05-25_glu_moca_struc_func_tau.xlsx")
 MRS_long <- X2026_05_02_glu_moca_struc_func
 
 # Clean the column name
@@ -63,9 +63,10 @@ jmv::descriptives(data = MRS_long, vars = vars(hippocampus_l_average_t1,
                                                parietal_sup_l_average_t2),
                   sd = TRUE, iqr = TRUE, skew = TRUE, kurt = TRUE)
 
-
+jmv::descriptives(data = MRS_long, vars = vars(plasma_ptau217),
+                  sd = TRUE, iqr = TRUE, skew = TRUE, kurt = TRUE, hist = TRUE)
 # Completness of dataset 
-
+names(MRS_long)
 
 ##################  Winzorising ###################
 # Define the winsorize function
@@ -86,6 +87,8 @@ MRS_long$percent_change_glu_prec <- winsorize_iqr(MRS_long$percent_change_glu_pr
 MRS_long$t1_glu_acc <- winsorize_iqr(MRS_long$t1_glu_acc, 1.5)
 MRS_long$t2_glu_acc <- winsorize_iqr(MRS_long$t2_glu_acc, 1.5)
 MRS_long$percent_change_glu_acc <- winsorize_iqr(MRS_long$percent_change_glu_acc, 1.5)
+
+MRS_long$plasma_ptau217 <- winsorize_iqr(MRS_long$plasma_ptau217, 1.5)
 ##  Structural MRI Variables
 MRS_long$t1_hipp_e_tiv <- winsorize_iqr(MRS_long$t1_hipp_e_tiv, 1.5)
 MRS_long$t2_hipp_e_tiv <- winsorize_iqr(MRS_long$t2_hipp_e_tiv, 1.5)
@@ -111,8 +114,15 @@ MRS_long$hipp_l_diff_activation <- winsorize_iqr(MRS_long$hipp_l_diff_activation
 
 
 
-names(MRS_long)
-### Characteristiques cliniques
+## Tau ##
+
+
+
+
+
+
+
+
 #Table 1
 #Table 1.1 - decliners
 jmv::descriptives(data = MRS_long, vars = vars(t1_age,education,slope_moca_raw,age_difference),
@@ -363,6 +373,41 @@ parameterEstimates(fit_sem_quad_prec, standardized = TRUE, ci = TRUE)
 
 ############ Logistic regressions
 library(pROC)
+#  plasma_ptau217 
+model_glu_ptau217 <- glm(decliners ~ plasma_ptau217, data = MRS_long, family = "binomial")
+summary(model_glu_ptau217)
+roc_ptau217 <- roc(model_glu_ptau217$y, fitted(model_glu_ptau217))
+auc(roc_ptau217)
+coords(roc_ptau217, "best", ret=c("threshold", "specificity", "sensitivity"), best.method="youden")
+
+#  plasma_ptau217  and glu
+model_glu_ptau217 <- glm(decliners ~ plasma_ptau217 + t1_glu_acc, data = MRS_long, family = "binomial")
+summary(model_glu_ptau217)
+roc_ptau217 <- roc(model_glu_ptau217$y, fitted(model_glu_ptau217))
+auc(roc_ptau217)
+coords(roc_ptau217, "best", ret=c("threshold", "specificity", "sensitivity"), best.method="youden")
+
+model_glu_ptau217 <- glm(decliners ~ plasma_ptau217 + t1_glu_prec, data = MRS_long, family = "binomial")
+summary(model_glu_ptau217)
+roc_ptau217 <- roc(model_glu_ptau217$y, fitted(model_glu_ptau217))
+auc(roc_ptau217)
+coords(roc_ptau217, "best", ret=c("threshold", "specificity", "sensitivity"), best.method="youden")
+
+
+## 3 variables with tau
+model_tau_glu_acc_parietal <- glm(decliners ~ plasma_ptau217 + t1_glu_acc + parietal_sup_l_average_t1, data = MRS_long, family = "binomial")
+summary(model_tau_glu_acc_parietal)
+roc_tau_glu_acc_parietal <- roc(model_tau_glu_acc_parietal$y, fitted(model_tau_glu_acc_parietal))
+auc(roc_tau_glu_acc_parietal)
+coords(roc_tau_glu_acc_parietal, "best", ret=c("threshold", "specificity", "sensitivity"), best.method="youden")
+
+model_tau_hipp_vol <- glm(decliners ~ plasma_ptau217 + t1_hipp_e_tiv + parietal_sup_l_average_t1, data = MRS_long, family = "binomial")
+summary(model_tau_hipp_vol)
+roc_tau_hipp_vol <- roc(model_tau_hipp_vol$y, fitted(model_tau_hipp_vol))
+auc(roc_tau_hipp_vol)
+coords(roc_tau_hipp_vol, "best", ret=c("threshold", "specificity", "sensitivity"), best.method="youden")
+
+
 
 # Precuneus GLutamate
 model_glu_prec <- glm(decliners ~ t1_glu_prec, data = MRS_long, family = "binomial")
@@ -432,7 +477,6 @@ coords(roc_metab_struc_thick, "best", ret=c("threshold", "specificity", "sensiti
 
 
 
-
 ## Combined models (3 variables )
 
 model_3var_1 <- glm(decliners ~ t1_glu_prec + t1_hipp_e_tiv + parietal_sup_l_average_t1, data = MRS_long, family = "binomial")
@@ -457,28 +501,15 @@ coords(roc_3var_3, "best", ret=c("threshold", "specificity", "sensitivity"), bes
 
 
 
-### Survival analysis
+
+
+
+names(MRS_long)
+
+
+
+
+
+### Survival Analysis Setup
 library(survival)
 library(survminer)
-
-MRS_long$decliners_numeric <- as.numeric(as.character(MRS_long$decliners))
-
-# Cox model
-cox_metab_func <- coxph(Surv(age_change_moca, decliners_numeric) ~ t1_glu_acc + parietal_sup_l_average_t1, data = MRS_long)
-
-# 3. View the results
-summary(cox_metab_func)
-
-
-
-# Cox model
-cox_metab_func <- coxph(Surv(age_change_moca, decliners_numeric) ~ t1_glu_prec, data = MRS_long)
-
-# 3. View the results
-summary(cox_metab_func)
-
-
-
-
-
-
