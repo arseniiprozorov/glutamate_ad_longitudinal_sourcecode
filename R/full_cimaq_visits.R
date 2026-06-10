@@ -104,11 +104,31 @@ MRS_long$visit_num <- as.numeric(gsub("t", "", MRS_long$visit))
 
 
 
-
+names(MRS_long)
 
 library(dplyr)
 library(tidyr)
-
+# ---------------------------------------------------------
+# Step 0: Create the Relative Timeline Object
+# ---------------------------------------------------------
+MRS_relative_discrete <- MRS_long %>%
+  # 1. Sort chronologically so visits are in order (t00, t02, t04, etc.)
+  arrange(participant_id, visit) %>% 
+  group_by(participant_id) %>%
+  
+  # 2. Identify which rows actually have glutamate data
+  mutate(has_glu = !is.na(glu_precuneus)) %>%
+  
+  # 3. Filter out anyone who NEVER had a glutamate scan
+  filter(any(has_glu)) %>%
+  
+  # 4. Create the new relative time axis anchored to the first scan
+  mutate(
+    glu_row_idx = which(has_glu)[1],       # Row number of their first scan
+    current_row = row_number(),            # Their actual chronological row
+    relative_visit = current_row - glu_row_idx  # Calculate the offset (-1, 0, +1)
+  ) %>%
+  ungroup()
 # ---------------------------------------------------------
 # Step 1: Group the relative timeline and average adjacent visits
 # ---------------------------------------------------------
@@ -129,7 +149,8 @@ binned_cascade <- MRS_relative_discrete %>%
                      parietal_sup_l_act,
                      glu_precuneus,
                      glu_acc,
-                     moca_score_total_30),
+                     moca_score_total_30,
+                     x99453_analyse_plasma_ptau217),
                    ~ mean(., na.rm = TRUE)), .groups = "drop") %>%
   # Clean up NaN values created by averaging NAs
   mutate(across(where(is.numeric), ~ ifelse(is.nan(.), NA, .))) %>%
@@ -145,100 +166,82 @@ pivot_wider(
                   parietal_sup_l_act,
                   glu_precuneus,
                   glu_acc,
-                  moca_score_total_30)
+                  moca_score_total_30,
+                  x99453_analyse_plasma_ptau217)
 )
 
-# ---------------------------------------------------------
-# Step 3: Run the Core Sequence Models
-# ---------------------------------------------------------
 
-print("=== ACT I: UPSTREAM (T_Pre Structure -> T_0 Metabolism & Activation) ===")
-
-# Does historical cortical thickness dictate the index baseline?
-print("--- T_Pre Cortical Thickness -> T_0 Glutamate ---")
-summary(lm(glu_precuneus_T_0 ~ norm_cortical_thickness_dickerson_T_Pre, data = binned_cascade))
-print("--- T_Pre Cortical Thickness -> T_0 Parietal Activation ---")
-summary(lm(parietal_sup_l_act_T_0 ~ norm_cortical_thickness_dickerson_T_Pre, data = binned_cascade))
-
-# Does historical hippocampal volume dictate the index baseline?
-print("--- T_Pre Hippocampal Volume -> T_0 Glutamate ---")
-summary(lm(glu_precuneus_T_0 ~ norm_sum_hippocampus_T_Pre, data = binned_cascade))
-print("--- T_Pre Hippocampal Volume -> T_0 Hippocampal Activation ---")
-summary(lm(hippocampus_avg_act_T_0 ~ norm_sum_hippocampus_T_Pre, data = binned_cascade))
-
-
-print("=== ACT II: DOWNSTREAM (T_0 Metabolism -> T_Post Structure, Activation & Cognition) ===")
-
-# Does the index glutamate surge protect future structure?
-print("--- T_0 Glutamate -> T_Post Cortical Thickness ---")
-summary(lm(norm_cortical_thickness_dickerson_T_Post ~ glu_precuneus_T_0, data = binned_cascade))
-print("--- T_0 Glutamate -> T_Post Hippocampal Volume ---")
-summary(lm(norm_sum_hippocampus_T_Post ~ glu_precuneus_T_0, data = binned_cascade))
-
-# Does the index glutamate surge predict future functional network states?
-print("--- T_0 Glutamate -> T_Post Parietal Activation ---")
-summary(lm(parietal_sup_l_act_T_Post ~ glu_precuneus_T_0, data = binned_cascade))
-print("--- T_0 Glutamate -> T_Post Hippocampal Activation ---")
-summary(lm(hippocampus_avg_act_T_Post ~ glu_precuneus_T_0, data = binned_cascade))
-
-# Does the index glutamate surge preserve global cognition?
-print("--- T_0 Glutamate -> T_Post MoCA Total ---")
-summary(lm(moca_score_total_30_T_Post ~ glu_precuneus_T_0, data = binned_cascade))
-
-
-
+names(binned_cascade)
 
 # ---------------------------------------------------------
 # Step 3: Run the Core Sequence Models (With Autoregressive Controls)
 # ---------------------------------------------------------
 
-print("=== ACT I: UPSTREAM (T_Pre Structure -> T_0 Metabolism & Activation) ===")
-# Note: Act I is already an unconfounded historical prediction model, as T_Pre occurs 
 # chronologically before T_0, and historical glutamate data is not present to control for.
 
-print("--- T_Pre Cortical Thickness -> T_0 Glutamate ---")
 summary(lm(glu_precuneus_T_0 ~ norm_cortical_thickness_dickerson_T_Pre, data = binned_cascade))
 
-print("--- T_Pre Cortical Thickness -> T_0 Parietal Activation ---")
-summary(lm(parietal_sup_l_act_T_0 ~ norm_cortical_thickness_dickerson_T_Pre, data = binned_cascade))
+summary(lm(glu_acc_T_0 ~ norm_cortical_thickness_dickerson_T_Pre, data = binned_cascade))
 
-print("--- T_Pre Hippocampal Volume -> T_0 Glutamate ---")
 summary(lm(glu_precuneus_T_0 ~ norm_sum_hippocampus_T_Pre, data = binned_cascade))
+summary(lm(glu_acc_T_0 ~ norm_sum_hippocampus_T_Pre, data = binned_cascade))
 
-print("--- T_Pre Hippocampal Volume -> T_0 Hippocampal Activation ---")
-summary(lm(hippocampus_avg_act_T_0 ~ norm_sum_hippocampus_T_Pre, data = binned_cascade))
+summary(lm(glu_precuneus_T_0 ~ norm_cortical_thickness_dickerson_T_Pre + norm_sum_hippocampus_T_Pre, data = binned_cascade))
+summary(lm(glu_acc_T_0 ~ norm_cortical_thickness_dickerson_T_Pre + norm_sum_hippocampus_T_Pre, data = binned_cascade))
+summary(lm(glu_precuneus_T_0 ~ + parietal_sup_l_act_T_Pre + hippocampus_avg_act_T_Pre, data = binned_cascade))
+summary(lm(glu_acc_T_0 ~ + parietal_sup_l_act_T_Pre + hippocampus_avg_act_T_Pre, data = binned_cascade))
+
+summary(lm(parietal_sup_l_act_T_0 ~ norm_cortical_thickness_dickerson_T_Pre + norm_sum_hippocampus_T_Pre, data = binned_cascade))
+summary(lm(hippocampus_avg_act_T_0 ~ norm_cortical_thickness_dickerson_T_Pre + norm_sum_hippocampus_T_Pre, data = binned_cascade))
+
+summary(lm(parietal_sup_l_act_T_0 ~ norm_sum_hippocampus_T_Pre, data = binned_cascade))
+summary(lm(hippocampus_avg_act_T_0 ~ norm_cortical_thickness_dickerson_T_Pre + norm_sum_hippocampus_T_Pre, data = binned_cascade))
 
 
-print("=== ACT II: DOWNSTREAM WITH HISTORICAL CONTROLS (Controlling for T_Pre) ===")
+colSums(!is.na(binned_cascade[, c("parietal_sup_l_act_T_Pre", 
+                                  "glu_acc_T_0", 
+                                  "parietal_sup_l_act_T_Post")]))
 # These models test if T0 Glutamate predicts change relative to the absolute pre-disease baseline
-
-print("--- T_0 Glutamate -> T_Post Cortical Thickness [Ctrl: T_Pre Thickness] ---")
 summary(lm(norm_cortical_thickness_dickerson_T_Post ~ glu_precuneus_T_0 + norm_cortical_thickness_dickerson_T_Pre, data = binned_cascade))
-
-print("--- T_0 Glutamate -> T_Post Hippocampal Volume [Ctrl: T_Pre Volume] ---")
 summary(lm(norm_sum_hippocampus_T_Post ~ glu_precuneus_T_0 + norm_sum_hippocampus_T_Pre, data = binned_cascade))
+summary(lm(norm_cortical_thickness_dickerson_T_Post ~ glu_precuneus_T_0 + norm_cortical_thickness_dickerson_T_Pre, data = binned_cascade))
+summary(lm(norm_sum_hippocampus_T_Post ~ glu_acc_T_0 + norm_sum_hippocampus_T_Pre, data = binned_cascade))
 
-print("--- T_0 Glutamate -> T_Post Parietal Activation [Ctrl: T_Pre Activation] ---")
-summary(lm(parietal_sup_l_act_T_Post ~ glu_precuneus_T_0 + parietal_sup_l_act_T_Pre, data = binned_cascade))
 
-print("--- T_0 Glutamate -> T_Post Hippocampal Activation [Ctrl: T_Pre Activation] ---")
+summary(lm(parietal_sup_l_act_T_Post ~ glu_precuneus_T_0 + parietal_sup_l_act_T_0 , data = binned_cascade))
+summary(lm(parietal_sup_l_act_T_Post ~ glu_acc_T_0 + parietal_sup_l_act_T_Pre , data = binned_cascade))
+
 summary(lm(hippocampus_avg_act_T_Post ~ glu_precuneus_T_0 + hippocampus_avg_act_T_Pre, data = binned_cascade))
+summary(lm(hippocampus_avg_act_T_Post ~ glu_acc_T_0 + hippocampus_avg_act_T_Pre, data = binned_cascade))
 
-print("--- T_0 Glutamate -> T_Post MoCA Total [Ctrl: T_Pre MoCA] ---")
+
 summary(lm(moca_score_total_30_T_Post ~ glu_precuneus_T_0 + moca_score_total_30_T_Pre, data = binned_cascade))
+summary(lm(moca_score_total_30_T_Post ~ glu_acc_T_0 + moca_score_total_30_T_Pre, data = binned_cascade))
 
 
-print("=== ACT II: DOWNSTREAM WITH CONCURRENT CONTROLS (Controlling for T_0) ===")
-# These models test if T0 Glutamate predicts subsequent change relative to the exact moment of the scan
+summary(lm(parietal_sup_l_act_T_0 ~ glu_precuneus_T_0, data = binned_cascade))
 
-print("--- T_0 Glutamate -> T_Post Cortical Thickness [Ctrl: T_0 Thickness] ---")
-summary(lm(norm_cortical_thickness_dickerson_T_Post ~ glu_precuneus_T_0 + norm_cortical_thickness_dickerson_T_0, data = binned_cascade))
 
-print("--- T_0 Glutamate -> T_Post Parietal Activation [Ctrl: T_0 Activation] ---")
-summary(lm(parietal_sup_l_act_T_Post ~ glu_precuneus_T_0 + parietal_sup_l_act_T_0, data = binned_cascade))
 
-print("--- T_0 Glutamate -> T_Post MoCA Total [Ctrl: T_0 MoCA] ---")
-summary(lm(moca_score_total_30_T_Post ~ glu_precuneus_T_0 + moca_score_total_30_T_0, data = binned_cascade))
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
