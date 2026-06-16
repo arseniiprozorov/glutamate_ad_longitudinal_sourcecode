@@ -1,161 +1,279 @@
 ########## Figures ############
-library(vcd)
-
-# 1. Prepare data (Percentages of Decliners within each Trajectory)
-acc_prop <- as.data.frame(prop.table(table(MRS_long$traj_glu_acc, MRS_long$decliners), margin = 1) * 100)
-colnames(acc_prop) <- c("Trajectory", "Outcome", "Percentage")
-
-# 2. Plot
-library(ggplot2)
-ggplot(acc_prop, aes(x = Trajectory, y = Percentage, fill = Outcome)) +
-  geom_bar(stat = "identity", position = "dodge") +
-  scale_fill_manual(values = c("0" = "#999999", "1" = "#d7191c"), 
-                    labels = c("Stable", "Declining")) +
-  theme_minimal() +
-  labs(title = "Clinical Outcome by ACC Glutamate Trajectory",
-       subtitle = "p = 0.0069 (Chi-Square)",
-       y = "Percentage of Group (%)",
-       x = "ACC Glutamate Trajectory (2 Years)") +
-  geom_text(aes(label = paste0(round(Percentage), "%")), 
-            position = position_dodge(width = 0.9), vjust = -0.5)
-
-
-
-
-
-
-
-
-#### Figure 2 
-
-
-
-
-library(tidyr)
 library(dplyr)
-library(lme4)
-library(lmerTest)
-library(emmeans)
 library(ggplot2)
-
-# 1. Reshape ACC data and annualize the time axis
-# We filter age_difference here if you want to strictly exclude data past 3 years, 
-# or just cap the plot later to keep the model power.
-MRS_acc_long <- MRS_long %>%
-  mutate(diagnostic_nick = factor(diagnostic_nick, levels = c("HC", "SCD+", "MCI"))) %>%
-  select(pscid, diagnostic_nick, sexe, education, 
-         t1_age, t2_age, age_difference,
-         t1_glu_acc, t2_glu_acc) %>%
-  pivot_longer(
-    cols = c(t1_glu_acc, t2_glu_acc),
-    names_to = "visit",
-    values_to = "glu_acc"
-  ) %>%
-  mutate(years_elapsed = ifelse(visit == "t1_glu_acc", 0, age_difference))
-
-# 2. Run the Annualized LMM for ACC
-# Replicating Model 1: neurotransmitter ~ diagnostic group x years
-model_acc_annual <- lmer(glu_acc ~ diagnostic_nick * years_elapsed + (1 | pscid), 
-                         data = MRS_acc_long)
-
-# 3. Extract annualized slopes (Beta = change in mmol/L per year)
-acc_stats <- emtrends(model_acc_annual, ~ diagnostic_nick, var = "years_elapsed")
-acc_summary <- summary(acc_stats, infer = TRUE)
-
-# 4. Create labels for the plot
-acc_labels <- acc_summary %>%
-  mutate(label = paste0("beta == ", round(years_elapsed.trend, 2), 
-                        "~~p == ", round(p.value, 3)))
-
-# 5. Create the faceted trajectory plot capped at 3 years
-ggplot(MRS_acc_long, aes(x = years_elapsed, y = glu_acc, color = diagnostic_nick)) +
-  geom_line(aes(group = pscid), alpha = 0.2, linewidth = 0.4) +
-  geom_point(alpha = 0.5) +
-  geom_smooth(method = "lm", linewidth = 1.5, se = TRUE, aes(fill = diagnostic_nick)) +
-  facet_wrap(~ diagnostic_nick) +
-  
-  # Add Stats (Annualized Beta and P-value)
-  geom_text(data = acc_labels, aes(x = 1.5, y = Inf, label = label), 
-            vjust = 2, color = "black", parse = TRUE, inherit.aes = FALSE) +
-  
-  # Cap the X-axis at 3 years for visual clarity
-  scale_x_continuous(limits = c(0, 3), breaks = c(0, 1, 2, 3)) +
-  
-  scale_color_manual(values = c("HC" = "#3B5998", "SCD+" = "#E69F00", "MCI" = "#D55E00")) +
-  scale_fill_manual(values = c("HC" = "#3B5998", "SCD+" = "#E69F00", "MCI" = "#D55E00")) +
-  labs(
-    title = "Annualized Glutamate Trajectories: ACC",
-    subtitle = "Faceted by clinical stage; Slopes (Beta) represent change per year",
-    x = "Years from Baseline ",
-    y = "ACC Glutamate (mM)"
-  ) +
-  theme_minimal() +
-  theme(legend.position = "none", panel.grid.minor = element_blank())
-
-
-
-
-
-library(tidyr)
+library(emmeans)
 library(dplyr)
-library(lme4)
-library(lmerTest)
-library(emmeans)
 library(ggplot2)
+library(emmeans)
 
-# 1. Reshape Precuneus data and annualize the time axis
-MRS_prec_long <- MRS_long %>%
-  mutate(diagnostic_nick = factor(diagnostic_nick, levels = c("HC", "SCD+", "MCI"))) %>%
-  select(pscid, diagnostic_nick, sexe, education, 
-         t1_age, t2_age, age_difference,
-         t1_glu_prec, t2_glu_prec) %>%
-  pivot_longer(
-    cols = c(t1_glu_prec, t2_glu_prec),
-    names_to = "visit",
-    values_to = "glu_prec"
-  ) %>%
-  mutate(years_elapsed = ifelse(visit == "t1_glu_prec", 0, age_difference))
+# 1. Extract slopes from the continuous model
+precun_slopes <- emtrends(mixed_model_precuneus, ~ m_m_precuneus_z, 
+                          var = "years_from_baseline", 
+                          at = list(m_m_precuneus_z = c(-1, 0, 1)))
+precun_slopes_summary <- summary(precun_slopes, infer = TRUE)
 
-# 2. Run the Annualized LMM for Precuneus
-# Replicating Model 1 from the paper: neurotransmitter ~ diagnosis * years
-model_prec_annual <- lmer(glu_prec ~ diagnostic_nick * years_elapsed + (1 | pscid), 
-                          data = MRS_prec_long)
+# 2. Wrap text in single quotes for clean math parsing
+precun_slopes_summary <- precun_slopes_summary %>%
+  mutate(
+    type = c("Low (-1 SD)", "Mean (0 SD)", "High (+1 SD)"),
+    label = paste0("'", type, ":' ~ beta == ", round(years_from_baseline.trend, 2), 
+                   " ~~~~~ p == ", round(p.value, 3))
+  )
 
-# 3. Extract annualized slopes (Beta = change in mmol/L per year)
-prec_stats <- emtrends(model_prec_annual, ~ diagnostic_nick, var = "years_elapsed")
-prec_summary <- summary(prec_stats, infer = TRUE)
+# 3. Generate model prediction lines and define discrete factor levels
+precun_preds <- emmeans(mixed_model_precuneus, ~ years_from_baseline * m_m_precuneus_z,
+                        at = list(years_from_baseline = seq(0, 6, by = 0.1), 
+                                  m_m_precuneus_z = c(-1, 0, 1))) %>% 
+  as.data.frame()
 
-# 4. Create labels for the plot
-prec_labels <- prec_summary %>%
-  mutate(label = paste0("beta == ", round(years_elapsed.trend, 2), 
-                        "~~p == ", round(p.value, 3)))
+precun_preds$Glutamate <- factor(precun_preds$m_m_precuneus_z, 
+                                 levels = c(-1, 0, 1), 
+                                 labels = c("Low (-1 SD)", "Mean (0 SD)", "High (+1 SD)"))
 
-# 5. Create the faceted trajectory plot capped at 3 years
-ggplot(MRS_prec_long, aes(x = years_elapsed, y = glu_prec, color = diagnostic_nick)) +
-  geom_line(aes(group = pscid), alpha = 0.2, linewidth = 0.4) +
-  geom_point(alpha = 0.5) +
-  geom_smooth(method = "lm", linewidth = 1.5, se = TRUE, aes(fill = diagnostic_nick)) +
-  facet_wrap(~ diagnostic_nick) +
+# 4. SIMPLIFIED DISCRETE PLOT
+ggplot() +
+  # Raw background data set to a neutral, uniform gray to eliminate the gradient
+  geom_line(data = MRS_prediction_long, 
+            aes(x = years_from_baseline, y = moca, group = pscid), 
+            color = "grey80", alpha = 0.3, linewidth = 0.4) +
+  geom_point(data = MRS_prediction_long, 
+             aes(x = years_from_baseline, y = moca), 
+             color = "grey75", alpha = 0.4, size = 1) +
   
-  # Add Stats (Annualized Beta and P-value)
-  geom_text(data = prec_labels, aes(x = 1.5, y = Inf, label = label), 
-            vjust = 2, color = "black", parse = TRUE, inherit.aes = FALSE) +
+  # Model prediction lines colored dynamically by their discrete factor level
+  geom_line(data = precun_preds, 
+            aes(x = years_from_baseline, y = emmean, group = Glutamate, color = Glutamate), 
+            linewidth = 2) + 
   
-  # Cap the X-axis at 3 years for visual clarity
-  scale_x_continuous(limits = c(0, 3), breaks = c(0, 1, 2, 3)) +
+  # FIXED: Define exactly three solid, non-graded colors manually
+  scale_color_manual(values = c("Low (-1 SD)" = "#D55E00",   # Orange/Red
+                                "Mean (0 SD)" = "#737373",  # Neutral Dark Gray
+                                "High (+1 SD)" = "#3B5998"), # Blue
+                     name = "Baseline Glutamate") +
   
-  scale_color_manual(values = c("HC" = "#3B5998", "SCD+" = "#E69F00", "MCI" = "#D55E00")) +
-  scale_fill_manual(values = c("HC" = "#3B5998", "SCD+" = "#E69F00", "MCI" = "#D55E00")) +
+  # Text annotations matching the exact line colors
+  annotate("text", x = 0.2, y = 23.4, label = precun_slopes_summary$label[1], parse = TRUE, hjust = 0, color = "#D55E00", size = 4.5) +
+  annotate("text", x = 0.2, y = 22.7, label = precun_slopes_summary$label[2], parse = TRUE, hjust = 0, color = "#737373", size = 4.5) +
+  annotate("text", x = 0.2, y = 22.0, label = precun_slopes_summary$label[3], parse = TRUE, hjust = 0, color = "#3B5998", size = 4.5) +
+  
+  scale_x_continuous(limits = c(0, 6), breaks = c(0, 2, 4, 6)) +
+  coord_cartesian(ylim = c(21.5, 30)) + 
+  
   labs(
-    title = "Annualized Glutamate Trajectories: Precuneus",
-    subtitle = "Faceted by clinical stage; Slopes (Beta) represent change per year",
+    title = "Continuous Cognitive Trajectories: Precuneus Glutamate",
+    subtitle = "Model-derived trajectories evaluated at three distinct baseline levels",
     x = "Years from Baseline",
-    y = "Precuneus Glutamate (mM)"
+    y = "MoCA Total Score (0-30)"
   ) +
-  theme_minimal() 
+  theme_minimal() +
+  theme(panel.grid.minor = element_blank(), legend.position = "right")
+
+
+
+#### ACC ####
+library(dplyr)
+library(ggplot2)
+library(emmeans)
+
+# 1. Extract slopes from the continuous ACC model
+acc_slopes <- emtrends(mixed_model_acc, ~ m_m_acc_z, 
+                       var = "years_from_baseline", 
+                       at = list(m_m_acc_z = c(-1, 0, 1)))
+acc_slopes_summary <- summary(acc_slopes, infer = TRUE)
+
+# 2. Wrap text in single quotes for clean math parsing
+acc_slopes_summary <- acc_slopes_summary %>%
+  mutate(
+    type = c("Low (-1 SD)", "Mean (0 SD)", "High (+1 SD)"),
+    label = paste0("'", type, ":' ~ beta == ", round(years_from_baseline.trend, 2), 
+                   " ~~~~~ p == ", round(p.value, 3))
+  )
+
+# 3. Generate model prediction lines and define discrete factor levels
+acc_preds <- emmeans(mixed_model_acc, ~ years_from_baseline * m_m_acc_z,
+                     at = list(years_from_baseline = seq(0, 6, by = 0.1), 
+                               m_m_acc_z = c(-1, 0, 1))) %>% 
+  as.data.frame()
+
+acc_preds$Glutamate <- factor(acc_preds$m_m_acc_z, 
+                              levels = c(-1, 0, 1), 
+                              labels = c("Low (-1 SD)", "Mean (0 SD)", "High (+1 SD)"))
+
+# 4. SIMPLIFIED DISCRETE PLOT FOR ACC
+ggplot() +
+  # Raw background data set to a neutral, uniform gray to eliminate the gradient
+  geom_line(data = MRS_prediction_long, 
+            aes(x = years_from_baseline, y = moca, group = pscid), 
+            color = "grey80", alpha = 0.3, linewidth = 0.4) +
+  geom_point(data = MRS_prediction_long, 
+             aes(x = years_from_baseline, y = moca), 
+             color = "grey75", alpha = 0.4, size = 1) +
   
+  # Model prediction lines colored dynamically by their discrete factor level
+  geom_line(data = acc_preds, 
+            aes(x = years_from_baseline, y = emmean, group = Glutamate, color = Glutamate), 
+            linewidth = 2) + 
   
+  # Define exactly three solid, non-graded colors manually
+  scale_color_manual(values = c("Low (-1 SD)" = "#D55E00",   # Orange/Red
+                                "Mean (0 SD)" = "#737373",  # Neutral Dark Gray
+                                "High (+1 SD)" = "#3B5998"), # Blue
+                     name = "Baseline Glutamate") +
   
+  # Text annotations matching the exact line colors
+  annotate("text", x = 0.2, y = 23.4, label = acc_slopes_summary$label[1], parse = TRUE, hjust = 0, color = "#D55E00", size = 4.5) +
+  annotate("text", x = 0.2, y = 22.7, label = acc_slopes_summary$label[2], parse = TRUE, hjust = 0, color = "#737373", size = 4.5) +
+  annotate("text", x = 0.2, y = 22.0, label = acc_slopes_summary$label[3], parse = TRUE, hjust = 0, color = "#3B5998", size = 4.5) +
+  
+  scale_x_continuous(limits = c(0, 6), breaks = c(0, 2, 4, 6)) +
+  coord_cartesian(ylim = c(21.5, 30)) + 
+  
+  labs(
+    title = "Continuous Cognitive Trajectories: ACC Glutamate",
+    subtitle = "Model-derived trajectories evaluated at three distinct baseline levels",
+    x = "Years from Baseline",
+    y = "MoCA Total Score (0-30)"
+  ) +
+  theme_minimal() +
+  theme(panel.grid.minor = element_blank(), legend.position = "right")
+
+
+
+
+########### Tau ############
+library(dplyr)
+library(ggplot2)
+library(emmeans)
+
+# 1. Extract slopes from the continuous p-Tau217 model
+ptau_slopes <- emtrends(mixed_model_ptau217, ~ plasma_ptau217_z, 
+                        var = "years_from_baseline", 
+                        at = list(plasma_ptau217_z = c(-1, 0, 1)))
+ptau_slopes_summary <- summary(ptau_slopes, infer = TRUE)
+
+# 2. Wrap text in single quotes for clean math parsing
+ptau_slopes_summary <- ptau_slopes_summary %>%
+  mutate(
+    type = c("Low (-1 SD)", "Mean (0 SD)", "High (+1 SD)"),
+    label = paste0("'", type, ":' ~ beta == ", round(years_from_baseline.trend, 2), 
+                   " ~~~~~ p == ", round(p.value, 3))
+  )
+
+# 3. Generate model prediction lines and define discrete factor levels
+ptau_preds <- emmeans(mixed_model_ptau217, ~ years_from_baseline * plasma_ptau217_z,
+                      at = list(years_from_baseline = seq(0, 6, by = 0.1), 
+                                plasma_ptau217_z = c(-1, 0, 1))) %>% 
+  as.data.frame()
+
+ptau_preds$pTau217 <- factor(ptau_preds$plasma_ptau217_z, 
+                             levels = c(-1, 0, 1), 
+                             labels = c("Low (-1 SD)", "Mean (0 SD)", "High (+1 SD)"))
+
+# 4. PLOT FOR PLASMA p-TAU217
+ggplot() +
+  # Raw background data set to neutral gray
+  geom_line(data = MRS_prediction_long, 
+            aes(x = years_from_baseline, y = moca, group = pscid), 
+            color = "grey80", alpha = 0.3, linewidth = 0.4) +
+  geom_point(data = MRS_prediction_long, 
+             aes(x = years_from_baseline, y = moca), 
+             color = "grey75", alpha = 0.4, size = 1) +
+  
+  # Model prediction lines
+  geom_line(data = ptau_preds, 
+            aes(x = years_from_baseline, y = emmean, group = pTau217, color = pTau217), 
+            linewidth = 2) + 
+  
+  # Color Mapping: Low p-Tau is blue (protective), High p-Tau is orange (risk)
+  scale_color_manual(values = c("Low (-1 SD)" = "#3B5998",   # Blue
+                                "Mean (0 SD)" = "#737373",  # Neutral Dark Gray
+                                "High (+1 SD)" = "#D55E00"), # Orange/Red
+                     name = "Baseline p-Tau217") +
+  
+  # Text annotations matching the respective line color assignments
+  annotate("text", x = 0.2, y = 23.4, label = ptau_slopes_summary$label[1], parse = TRUE, hjust = 0, color = "#3B5998", size = 4.5) +
+  annotate("text", x = 0.2, y = 22.7, label = ptau_slopes_summary$label[2], parse = TRUE, hjust = 0, color = "#737373", size = 4.5) +
+  annotate("text", x = 0.2, y = 22.0, label = ptau_slopes_summary$label[3], parse = TRUE, hjust = 0, color = "#D55E00", size = 4.5) +
+  
+  scale_x_continuous(limits = c(0, 6), breaks = c(0, 2, 4, 6)) +
+  coord_cartesian(ylim = c(21.5, 30)) + 
+  
+  labs(
+    title = "Continuous Cognitive Trajectories: Plasma p-Tau217",
+    subtitle = "Model-derived trajectories evaluated at three distinct baseline levels",
+    x = "Years from Baseline",
+    y = "MoCA Total Score (0-30)"
+  ) +
+  theme_minimal() +
+  theme(panel.grid.minor = element_blank(), legend.position = "right")
+
+
+
+### Structure
+
+# 1. Extract slopes from the continuous Cortical Thickness model
+thick_slopes <- emtrends(mixed_model_thickness, ~ cortical_thickness_adsignature_dickson_z, 
+                         var = "years_from_baseline", 
+                         at = list(cortical_thickness_adsignature_dickson_z = c(-1, 0, 1)))
+thick_slopes_summary <- summary(thick_slopes, infer = TRUE)
+
+# 2. Wrap text in single quotes for clean math parsing
+thick_slopes_summary <- thick_slopes_summary %>%
+  mutate(
+    type = c("Low (-1 SD)", "Mean (0 SD)", "High (+1 SD)"),
+    label = paste0("'", type, ":' ~ beta == ", round(years_from_baseline.trend, 2), 
+                   " ~~~~~ p == ", round(p.value, 3))
+  )
+
+# 3. Generate model prediction lines and define discrete factor levels
+thick_preds <- emmeans(mixed_model_thickness, ~ years_from_baseline * cortical_thickness_adsignature_dickson_z,
+                       at = list(years_from_baseline = seq(0, 6, by = 0.1), 
+                                 cortical_thickness_adsignature_dickson_z = c(-1, 0, 1))) %>% 
+  as.data.frame()
+
+thick_preds$Thickness <- factor(thick_preds$cortical_thickness_adsignature_dickson_z, 
+                                levels = c(-1, 0, 1), 
+                                labels = c("Low (-1 SD)", "Mean (0 SD)", "High (+1 SD)"))
+
+# 4. PLOT FOR CORTICAL THICKNESS
+ggplot() +
+  # Raw background data set to neutral gray
+  geom_line(data = MRS_prediction_long, 
+            aes(x = years_from_baseline, y = moca, group = pscid), 
+            color = "grey80", alpha = 0.3, linewidth = 0.4) +
+  geom_point(data = MRS_prediction_long, 
+             aes(x = years_from_baseline, y = moca), 
+             color = "grey75", alpha = 0.4, size = 1) +
+  
+  # Model prediction lines
+  geom_line(data = thick_preds, 
+            aes(x = years_from_baseline, y = emmean, group = Thickness, color = Thickness), 
+            linewidth = 2) + 
+  
+  # Color Mapping: Low thickness is orange (at-risk), High thickness is blue (protective)
+  scale_color_manual(values = c("Low (-1 SD)" = "#D55E00",   # Orange/Red
+                                "Mean (0 SD)" = "#737373",  # Neutral Dark Gray
+                                "High (+1 SD)" = "#3B5998"), # Blue
+                     name = "Baseline Thickness") +
+  
+  # Text annotations matching the respective line color assignments
+  annotate("text", x = 0.2, y = 23.4, label = thick_slopes_summary$label[1], parse = TRUE, hjust = 0, color = "#D55E00", size = 4.5) +
+  annotate("text", x = 0.2, y = 22.7, label = thick_slopes_summary$label[2], parse = TRUE, hjust = 0, color = "#737373", size = 4.5) +
+  annotate("text", x = 0.2, y = 22.0, label = thick_slopes_summary$label[3], parse = TRUE, hjust = 0, color = "#3B5998", size = 4.5) +
+  
+  scale_x_continuous(limits = c(0, 6), breaks = c(0, 2, 4, 6)) +
+  coord_cartesian(ylim = c(21.5, 30)) + 
+  
+  labs(
+    title = "Continuous Cognitive Trajectories: AD-Signature Cortical Thickness",
+    subtitle = "Model-derived trajectories evaluated at three distinct baseline levels",
+    x = "Years from Baseline",
+    y = "MoCA Total Score (0-30)"
+  ) +
+  theme_minimal() +
+  theme(panel.grid.minor = element_blank(), legend.position = "right")
+
+
   
 
 
@@ -163,7 +281,11 @@ ggplot(MRS_prec_long, aes(x = years_elapsed, y = glu_prec, color = diagnostic_ni
 
 
 
-  
+
+
+
+
+
   
   library(tidyr); library(dplyr); library(lme4); library(lmerTest); library(emmeans); library(ggplot2)
 
