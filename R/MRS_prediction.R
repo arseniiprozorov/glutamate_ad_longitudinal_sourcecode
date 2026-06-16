@@ -16,6 +16,7 @@ library(pROC)
 X2026_06_15_dataset_prediction <- read_excel("C:/Users/okkam/Desktop/labo/article 2/Longitudinal_Multimodal_Data_CIMAQ/article_prediction/2026-06-15_dataset_prediction.xlsx")
 MRS_prediction <- X2026_06_15_dataset_prediction
 
+
 # Clean the column name
 MRS_prediction <- janitor::clean_names(MRS_prediction)
 names(MRS_prediction)
@@ -90,8 +91,15 @@ MRS_prediction$hipp_mean_z <- scale(MRS_prediction$hipp_mean)
 MRS_prediction$activation_hippocampus_l_z <- scale(MRS_prediction$activation_hippocampus_l)
 MRS_prediction$hipp_mean_act_z <- scale(MRS_prediction$hipp_mean_act)
 MRS_prediction$activation_parietal_sup_l_z <- scale(MRS_prediction$activation_parietal_sup_l)
-######### Analyses ######
-## Characterization ##
+
+X2026_06_16_MRS_prediction_long <- read_excel("C:/Users/okkam/Desktop/labo/article 2/Longitudinal_Multimodal_Data_CIMAQ/article_prediction/2026-06-16_MRS_prediction_long.xlsx")
+MRS_prediction_long <- X2026_06_16_MRS_prediction_long
+
+
+
+
+######################################### Analyses #######################################
+######### Characterization ###############
 #sink("demographic.txt")
 # Table 1: Sociodemographic & Clinical Characteristics
 # Table 1.1  Split by Decliners Status 
@@ -178,7 +186,8 @@ summary(aov(activation_parietal_sup_l ~ diagnostic_nick, data = MRS_prediction))
 
 #sink()
 
-########## Objective 1 #############
+
+############################ Objective 1 #######################
 names(MRS_prediction)
 #sink("objective_1_outputs.txt")
 # Moca slope as continous
@@ -193,8 +202,6 @@ summary(lm(slope_moca_raw ~ activation_parietal_sup_l, data = MRS_prediction))
 
 ## same with LMM
 
-X2026_06_16_MRS_prediction_long <- read_excel("C:/Users/okkam/Desktop/labo/article 2/Longitudinal_Multimodal_Data_CIMAQ/article_prediction/2026-06-16_MRS_prediction_long.xlsx")
-MRS_prediction_long <- X2026_06_16_MRS_prediction_long
 
 names(MRS_prediction_long)
 # Mixed-Effects Models
@@ -234,14 +241,48 @@ summary(mixed_model_activation_parietal_l)
 
 #sink()
 
+#   Glutamate 
+mixed_model_precuneus <- lmer(moca ~ years_from_baseline * m_m_precuneus_z + (1  | pscid),  
+                              data = MRS_prediction_long)
+summary(mixed_model_precuneus)
 
+mixed_model_acc <- lmer(moca ~ years_from_baseline * m_m_acc_z + (1 | pscid),  
+                        data = MRS_prediction_long)
+summary(mixed_model_acc)
+
+#   pTau217 + acc 
+mixed_model_ptau217 <- lmer(moca ~ years_from_baseline * plasma_ptau217_z + age_difference + (1 | pscid),  
+                            data = MRS_prediction_long)
+summary(mixed_model_ptau217)
+
+# Structure
+mixed_model_thickness <- lmer(
+  moca ~ years_from_baseline * cortical_thickness_adsignature_dickson_z + (1 | pscid),  
+  data = MRS_prediction_long)
+summary(mixed_model_thickness)
+
+mixed_model_hipp_mean <- lmer(moca ~ years_from_baseline * hipp_mean_z + (1 | pscid),  
+                              data = MRS_prediction_long)
+summary(mixed_model_hipp_mean)
+
+# Activation 
+mixed_model_hipp_mean_act <- lmer(moca ~ years_from_baseline * hipp_mean_act_z + (1 | pscid),  
+                                  data = MRS_prediction_long)
+summary(mixed_model_hipp_mean_act)
+
+mixed_model_activation_parietal_l <- lmer(moca ~ years_from_baseline * activation_parietal_sup_l_z + 
+                                            (1 | pscid),data = MRS_prediction_long)
+summary(mixed_model_activation_parietal_l)
+
+names(MRS_prediction)
 ################# Logistic regression ######################
 # plasma_ptau217 
-model_glu_ptau217 <- glm(decliners ~ plasma_ptau217_z + age_difference, data = MRS_prediction, family = "binomial")
+model_glu_ptau217 <- glm(decliners ~ plasma_ptau217_z, data = MRS_prediction, family = "binomial")
 summary(model_glu_ptau217)
 roc_ptau217 <- roc(model_glu_ptau217$y, fitted(model_glu_ptau217))
 auc(roc_ptau217)
 coords(roc_ptau217, "best", ret=c("threshold", "specificity", "sensitivity"), best.method="youden")
+
 
 # Precuneus Glutamate
 model_glu_prec <- glm(decliners ~ m_m_precuneus_z, data = MRS_prediction, family = "binomial")
@@ -369,7 +410,11 @@ coords(roc_prec_acc, "best", ret=c("threshold", "specificity", "sensitivity"), b
 
 
 
-### Non glu 2 variables models
+
+
+
+
+### Non glu  variables models
 # 1. p-Tau217 + Hippocampal Volume + Hippocampal Activation
 model_ptau_hipvol_hipact <- glm(decliners ~ plasma_ptau217_z + hipp_mean_z + hipp_mean_act_z, data = MRS_prediction, family = "binomial")
 summary(model_ptau_hipvol_hipact)
@@ -395,5 +440,31 @@ coords(roc_thick_hipact, "best", ret=c("threshold", "specificity", "sensitivity"
 
 
 
+
+
+
 ### Objerctive 3 #####
 ## Sruvival analysis #####
+library(survival)
+names(MRS_prediction)
+sapply(MRS_prediction, class)
+
+summary(coxph(Surv(time_to_event, ever_declined) ~ plasma_ptau217_z + initiale_age, data = MRS_prediction))
+summary(coxph(Surv(time_to_event, ever_declined) ~ m_m_acc_z  + initiale_age, data = MRS_prediction))
+summary(coxph(Surv(time_to_event, ever_declined) ~ m_m_precuneus_z + initiale_age, data = MRS_prediction))
+summary(coxph(Surv(time_to_event, ever_declined) ~ hipp_mean + initiale_age, data = MRS_prediction))
+summary(coxph(Surv(time_to_event, ever_declined) ~ cortical_thickness_adsignature_dickson + initiale_age, data = MRS_prediction))
+summary(coxph(Surv(time_to_event, ever_declined) ~ hipp_mean_act + initiale_age, data = MRS_prediction))
+summary(coxph(Surv(time_to_event, ever_declined) ~ activation_parietal_sup_l + initiale_age, data = MRS_prediction))
+
+
+summary(coxph(Surv(time_to_event, ever_declined) ~ m_m_acc_z + plasma_ptau217_z + initiale_age, data = MRS_prediction))
+summary(coxph(Surv(time_to_event, ever_declined) ~ m_m_acc_z + activation_parietal_sup_l + initiale_age, data = MRS_prediction))
+summary(coxph(Surv(time_to_event, ever_declined) ~ m_m_acc_z + hipp_mean_act_z + initiale_age, data = MRS_prediction))
+summary(coxph(Surv(time_to_event, ever_declined) ~ m_m_acc_z + cortical_thickness_adsignature_dickson + initiale_age, data = MRS_prediction))
+summary(coxph(Surv(time_to_event, ever_declined) ~ m_m_acc_z + hipp_mean + initiale_age, data = MRS_prediction))
+
+
+
+
+
