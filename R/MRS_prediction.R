@@ -205,43 +205,44 @@ summary(lm(slope_moca_raw ~ activation_parietal_sup_l, data = MRS_prediction))
 names(MRS_prediction_long)
 # Mixed-Effects Models
 #   Glutamate 
-mixed_model_precuneus <- lmer(moca ~ years_from_baseline * m_m_precuneus_z + (1 | pscid),  
+mixed_model_precuneus <- lmer(moca ~ years_from_baseline * m_m_precuneus_z + sexe + diagnostic_nick + education +  (1 | pscid),  
   data = MRS_prediction_long)
 summary(mixed_model_precuneus)
 
-mixed_model_acc <- lmer(moca ~ years_from_baseline * m_m_acc_z + (1 | pscid),  
+mixed_model_acc <- lmer(moca ~ years_from_baseline * m_m_acc_z + + sexe + diagnostic_nick + education +(1 | pscid),  
   data = MRS_prediction_long)
 summary(mixed_model_acc)
 
 
 #   pTau217 
-mixed_model_ptau217 <- lmer(moca ~ years_from_baseline * plasma_ptau217_z + age_difference + (1 | pscid),  
+mixed_model_ptau217 <- lmer(moca ~ years_from_baseline * plasma_ptau217_z + age_difference + sexe + diagnostic_nick + education + (1 | pscid),  
   data = MRS_prediction_long)
 summary(mixed_model_ptau217)
 
 # Structure
 mixed_model_thickness <- lmer(
-  moca ~ years_from_baseline * cortical_thickness_adsignature_dickson_z + (1 | pscid),  
+  moca ~ years_from_baseline * cortical_thickness_adsignature_dickson_z + + sexe + diagnostic_nick + education +(1 | pscid),  
   data = MRS_prediction_long)
 summary(mixed_model_thickness)
 
-mixed_model_hipp_mean <- lmer(moca ~ years_from_baseline * hipp_mean_z + (1 | pscid),  
+mixed_model_hipp_mean <- lmer(moca ~ years_from_baseline * hipp_mean_z + + sexe + diagnostic_nick + education + (1 | pscid),  
   data = MRS_prediction_long)
 summary(mixed_model_hipp_mean)
 
 # Activation 
-mixed_model_hipp_mean_act <- lmer(moca ~ years_from_baseline * hipp_mean_act_z + (1 | pscid),  
+mixed_model_hipp_mean_act <- lmer(moca ~ years_from_baseline * hipp_mean_act_z + + sexe + diagnostic_nick + education + (1 | pscid),  
   data = MRS_prediction_long)
 summary(mixed_model_hipp_mean_act)
 
-mixed_model_activation_parietal_l <- lmer(moca ~ years_from_baseline * activation_parietal_sup_l_z + 
+mixed_model_activation_parietal_l <- lmer(moca ~ years_from_baseline * activation_parietal_sup_l_z + + sexe + diagnostic_nick + education +
                                             (1 | pscid),data = MRS_prediction_long)
 summary(mixed_model_activation_parietal_l)
 
 #sink()
 
+
 #   Glutamate 
-mixed_model_precuneus <- lmer(moca ~ years_from_baseline * m_m_precuneus_z + (1  | pscid),  
+mixed_model_precuneus <- lmer(moca ~ years_from_baseline * plasma_ptau217_z  +  (1  | pscid),  
                               data = MRS_prediction_long)
 summary(mixed_model_precuneus)
 
