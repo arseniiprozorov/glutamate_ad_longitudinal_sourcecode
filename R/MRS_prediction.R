@@ -202,11 +202,10 @@ summary(lm(slope_moca_raw ~ activation_parietal_sup_l, data = MRS_prediction))
 
 ## same with LMM
 
-
 names(MRS_prediction_long)
 # Mixed-Effects Models
 #   Glutamate 
-mixed_model_precuneus <- lmer(moca ~ years_from_baseline * m_m_precuneus_z + (1  | pscid),  
+mixed_model_precuneus <- lmer(moca ~ years_from_baseline * m_m_precuneus_z + (1 | pscid),  
   data = MRS_prediction_long)
 summary(mixed_model_precuneus)
 
