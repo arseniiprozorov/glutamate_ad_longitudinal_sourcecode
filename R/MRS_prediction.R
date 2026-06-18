@@ -77,7 +77,7 @@ MRS_prediction$activation_temporal_inf_r <- winsorize_iqr(MRS_prediction$activat
 jmv::descriptives(data = MRS_prediction, vars = vars(m_m_precuneus, m_m_acc, plasma_ptau217,
                                                      cortical_thickness_adsignature_dickson, 
                                                      hipp_mean,hipp_mean_act,activation_parietal_sup_l),
-                  sd = TRUE, iqr = TRUE, skew = TRUE, kurt = TRUE)
+                  sd = TRUE, iqr = TRUE, skew = TRUE, kurt = TRUE, splitBy = converter_to_mci)
 
 
 
@@ -409,11 +409,6 @@ coords(roc_prec_acc, "best", ret=c("threshold", "specificity", "sensitivity"), b
 
 
 
-
-
-
-
-
 ### Non glu  variables models
 # 1. p-Tau217 + Hippocampal Volume + Hippocampal Activation
 model_ptau_hipvol_hipact <- glm(decliners ~ plasma_ptau217_z + hipp_mean_z + hipp_mean_act_z, data = MRS_prediction, family = "binomial")
@@ -441,8 +436,6 @@ coords(roc_thick_hipact, "best", ret=c("threshold", "specificity", "sensitivity"
 
 
 
-
-
 ### Objerctive 3 #####
 ## Sruvival analysis #####
 library(survival)
@@ -456,6 +449,9 @@ summary(coxph(Surv(time_to_event, ever_declined) ~ hipp_mean + initiale_age, dat
 summary(coxph(Surv(time_to_event, ever_declined) ~ cortical_thickness_adsignature_dickson + initiale_age, data = MRS_prediction))
 summary(coxph(Surv(time_to_event, ever_declined) ~ hipp_mean_act + initiale_age, data = MRS_prediction))
 summary(coxph(Surv(time_to_event, ever_declined) ~ activation_parietal_sup_l + initiale_age, data = MRS_prediction))
+
+
+
 
 
 summary(coxph(Surv(time_to_event, ever_declined) ~ m_m_acc_z + plasma_ptau217_z + initiale_age, data = MRS_prediction))
