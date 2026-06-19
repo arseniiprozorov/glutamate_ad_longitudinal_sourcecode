@@ -6,69 +6,340 @@ library(dplyr)
 library(ggplot2)
 library(emmeans)
 
-# 1. Extract slopes from the continuous model
-precun_slopes <- emtrends(mixed_model_precuneus, ~ m_m_precuneus_z, 
-                          var = "years_from_baseline", 
-                          at = list(m_m_precuneus_z = c(-1, 0, 1)))
-precun_slopes_summary <- summary(precun_slopes, infer = TRUE)
 
-# 2. Wrap text in single quotes for clean math parsing
-precun_slopes_summary <- precun_slopes_summary %>%
-  mutate(
-    type = c("Low (-1 SD)", "Mean (0 SD)", "High (+1 SD)"),
-    label = paste0("'", type, ":' ~ beta == ", round(years_from_baseline.trend, 2), 
-                   " ~~~~~ p == ", round(p.value, 3))
-  )
+library(emmeans)
+library(ggplot2)
+library(dplyr)
 
-# 3. Generate model prediction lines and define discrete factor levels
-precun_preds <- emmeans(mixed_model_precuneus, ~ years_from_baseline * m_m_precuneus_z,
-                        at = list(years_from_baseline = seq(0, 6, by = 0.1), 
-                                  m_m_precuneus_z = c(-1, 0, 1))) %>% 
-  as.data.frame()
-
-precun_preds$Glutamate <- factor(precun_preds$m_m_precuneus_z, 
-                                 levels = c(-1, 0, 1), 
-                                 labels = c("Low (-1 SD)", "Mean (0 SD)", "High (+1 SD)"))
-
-# 4. SIMPLIFIED DISCRETE PLOT
-ggplot() +
-  # Raw background data set to a neutral, uniform gray to eliminate the gradient
-  geom_line(data = MRS_prediction_long, 
-            aes(x = years_from_baseline, y = moca, group = pscid), 
-            color = "grey80", alpha = 0.3, linewidth = 0.4) +
-  geom_point(data = MRS_prediction_long, 
-             aes(x = years_from_baseline, y = moca), 
-             color = "grey75", alpha = 0.4, size = 1) +
+# ==============================================================================
+# 1. MODIFIED MASTER VISUALIZATION ENGINE (With Ribbons & 24-30 scale)
+# ==============================================================================
+generate_trajectory_plot <- function(model_obj, var_name, title_text, legend_text) {
   
-  # Model prediction lines colored dynamically by their discrete factor level
-  geom_line(data = precun_preds, 
-            aes(x = years_from_baseline, y = emmean, group = Glutamate, color = Glutamate), 
-            linewidth = 2) + 
+  # Build spec formula
+  preds_formula <- as.formula(paste("~ years_from_baseline *", var_name))
   
-  # FIXED: Define exactly three solid, non-graded colors manually
-  scale_color_manual(values = c("Low (-1 SD)" = "#D55E00",   # Orange/Red
-                                "Mean (0 SD)" = "#737373",  # Neutral Dark Gray
-                                "High (+1 SD)" = "#3B5998"), # Blue
-                     name = "Baseline Glutamate") +
+  # Generate line coordinates (emmeans automatically includes CLs)
+  at_grid <- list(years_from_baseline = seq(0, 6, by = 0.1))
+  at_grid[[var_name]] <- c(-1, 0, 1)
   
-  # Text annotations matching the exact line colors
-  annotate("text", x = 0.2, y = 23.4, label = precun_slopes_summary$label[1], parse = TRUE, hjust = 0, color = "#D55E00", size = 4.5) +
-  annotate("text", x = 0.2, y = 22.7, label = precun_slopes_summary$label[2], parse = TRUE, hjust = 0, color = "#737373", size = 4.5) +
-  annotate("text", x = 0.2, y = 22.0, label = precun_slopes_summary$label[3], parse = TRUE, hjust = 0, color = "#3B5998", size = 4.5) +
+  preds_df <- emmeans(model_obj, specs = preds_formula, at = at_grid) %>% as.data.frame()
   
-  scale_x_continuous(limits = c(0, 6), breaks = c(0, 2, 4, 6)) +
-  coord_cartesian(ylim = c(21.5, 30)) + 
+  # Map grouping factor
+  preds_df$Biomarker_Level <- factor(preds_df[[var_name]], 
+                                     levels = c(-1, 0, 1), 
+                                     labels = c("Low (-1 SD)", "Mean (0 SD)", "High (+1 SD)"))
   
-  labs(
-    title = "Continuous Cognitive Trajectories: Precuneus Glutamate",
-    subtitle = "Model-derived trajectories evaluated at three distinct baseline levels",
-    x = "Years from Baseline",
-    y = "MoCA Total Score (0-30)"
-  ) +
-  theme_minimal() +
-  theme(panel.grid.minor = element_blank(), legend.position = "right")
+  # Color/Fill Palette
+  pal_colors <- c("Low (-1 SD)" = "#D55E00", 
+                  "Mean (0 SD)" = "#737373", 
+                  "High (+1 SD)" = "#3B5998")
+  
+  # Build ggplot
+  p <- ggplot() +
+    # Uniform gray background spaghetti data
+    geom_line(data = MRS_prediction_long, 
+              aes(x = years_from_baseline, y = moca, group = pscid), 
+              color = "grey80", alpha = 0.3, linewidth = 0.4) +
+    
+    # ADDED: Error Shadow Ribbons (placed before lines so they appear behind)
+    geom_ribbon(data = preds_df, 
+                aes(x = years_from_baseline, ymin = lower.CL, ymax = upper.CL, fill = Biomarker_Level), 
+                alpha = 0.15) +
+    
+    # Solid prediction paths
+    geom_line(data = preds_df, 
+              aes(x = years_from_baseline, y = emmean, group = Biomarker_Level, color = Biomarker_Level), 
+              linewidth = 2) + 
+    
+    scale_color_manual(values = pal_colors, name = legend_text) +
+    scale_fill_manual(values = pal_colors, name = legend_text) + # Required for the ribbon fill
+    
+    scale_x_continuous(limits = c(0, 6), breaks = c(0, 2, 4, 6)) +
+    # FIXED SCALE 24-30
+    coord_cartesian(ylim = c(24, 28)) + 
+    labs(
+      title = title_text,
+      subtitle = "Trajectories with 95% Confidence Intervals",
+      x = "Years from Baseline",
+      y = "MoCA Total Score (24-30)"
+    ) +
+    theme_minimal() +
+    theme(panel.grid.minor = element_blank(), legend.position = "right")
+  
+  return(p)
+}
+
+# ==============================================================================
+# 2. RUN THE ENGINE
+# ==============================================================================
+# All calls remain the same as your previous script
+plot_precuneus <- generate_trajectory_plot(mixed_model_precuneus, "m_m_precuneus_z", "Precuneus Glutamate", "Baseline Precuneus Glu")
+plot_acc <- generate_trajectory_plot(mixed_model_acc, "m_m_acc_z", "ACC Glutamate", "Baseline ACC Glutamate")
+plot_ptau217 <- generate_trajectory_plot(mixed_model_ptau217, "plasma_ptau217_z", "Plasma p-Tau217", "Baseline Plasma p-Tau")
+plot_thickness <- generate_trajectory_plot(mixed_model_thickness, "cortical_thickness_adsignature_dickson_z", "Cortical Thickness", "Baseline Thickness")
+plot_hipp_vol <- generate_trajectory_plot(mixed_model_hipp_mean, "hipp_mean_z", "Hippocampal Volume", "Baseline Hipp Volume")
+plot_hipp_act <- generate_trajectory_plot(mixed_model_hipp_mean_act, "hipp_mean_act_z", "Hippocampal Activation", "Baseline Hipp Activation")
+plot_parietal_act <- generate_trajectory_plot(mixed_model_activation_parietal_l, "activation_parietal_sup_l_z", "Left Parietal Activation", "Baseline Parietal Act")
+
+# ==============================================================================
+# 3. DISPLAY PLOTS
+# ==============================================================================
+print(plot_ptau217)
+print(plot_acc)
+print(plot_precuneus)
+print(plot_thickness)
+print(plot_hipp_vol)
+print(plot_hipp_act)
+print(plot_parietal_act)
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+library(emmeans)
+library(ggplot2)
+library(dplyr)
+
+# ==============================================================================
+# 1. DEFINE THE MASTER VISUALIZATION ENGINE
+# ==============================================================================
+generate_trajectory_plot <- function(model_obj, var_name, title_text, legend_text, 
+                                     y1 = 23.4, y2 = 22.7, y3 = 22.0) {
+  
+  # A. Dynamic list allocation for emtrends/emmeans slicing
+  at_list <- list()
+  at_list[[var_name]] <- c(-1, 0, 1)
+  
+  # Build spec formulas dynamically from strings
+  spec_formula <- as.formula(paste("~", var_name))
+  preds_formula <- as.formula(paste("~ years_from_baseline *", var_name))
+  
+  # B. Extract trends/slopes with math expression parsing
+  slopes <- emtrends(model_obj, specs = spec_formula, 
+                     var = "years_from_baseline", at = at_list)
+  slopes_summary <- summary(slopes, infer = TRUE)
+  
+  slopes_summary <- slopes_summary %>%
+    mutate(
+      type = c("Low (-1 SD)", "Mean (0 SD)", "High (+1 SD)"),
+      label = paste0("'", type, ":' ~ beta == ", round(years_from_baseline.trend, 2), 
+                     " ~~~~~ p == ", round(p.value, 3))
+    )
+  
+  # C. Generate line coordinates across a continuous grid (0 to 6 years)
+  at_grid <- list(years_from_baseline = seq(0, 6, by = 0.1))
+  at_grid[[var_name]] <- c(-1, 0, 1)
+  
+  preds_df <- emmeans(model_obj, specs = preds_formula, at = at_grid) %>% as.data.frame()
+  
+  # Map grouping factor
+  preds_df$Biomarker_Level <- factor(preds_df[[var_name]], 
+                                     levels = c(-1, 0, 1), 
+                                     labels = c("Low (-1 SD)", "Mean (0 SD)", "High (+1 SD)"))
+  
+  # D. Build ggplot following exact user visual layout parameters
+  p <- ggplot() +
+    # Uniform gray background spaghetti data
+    geom_line(data = MRS_prediction_long, 
+              aes(x = years_from_baseline, y = moca, group = pscid), 
+              color = "grey80", alpha = 0.3, linewidth = 0.4) +
+    geom_point(data = MRS_prediction_long, 
+               aes(x = years_from_baseline, y = moca), 
+               color = "grey75", alpha = 0.4, size = 1) +
+    
+    # Solid, non-graded model prediction paths
+    geom_line(data = preds_df, 
+              aes(x = years_from_baseline, y = emmean, group = Biomarker_Level, color = Biomarker_Level), 
+              linewidth = 2) + 
+    
+    # Exact publication hex color mappings
+    scale_color_manual(values = c("Low (-1 SD)" = "#D55E00",  
+                                  "Mean (0 SD)" = "#737373",  
+                                  "High (+1 SD)" = "#3B5998"), 
+                       name = legend_text) +
+    
+    # Mathematical expression text overlays
+    annotate("text", x = 0.2, y = y1, label = slopes_summary$label[1], parse = TRUE, hjust = 0, color = "#D55E00", size = 4.5) +
+    annotate("text", x = 0.2, y = y2, label = slopes_summary$label[2], parse = TRUE, hjust = 0, color = "#737373", size = 4.5) +
+    annotate("text", x = 0.2, y = y3, label = slopes_summary$label[3], parse = TRUE, hjust = 0, color = "#3B5998", size = 4.5) +
+    
+    scale_x_continuous(limits = c(0, 6), breaks = c(0, 2, 4, 6)) +
+    coord_cartesian(ylim = c(21.5, 30)) + 
+    labs(
+      title = title_text,
+      subtitle = "Model-derived trajectories evaluated at three distinct baseline levels",
+      x = "Years from Baseline",
+      y = "MoCA Total Score (0-30)"
+    ) +
+    theme_minimal() +
+    theme(panel.grid.minor = element_blank(), legend.position = "right")
+  
+  return(p)
+}
+
+
+# ==============================================================================
+# 2. RUN THE ENGINE FOR ALL UNIMODAL PLOTS
+# ==============================================================================
+
+# Note: Adjust y1, y2, y3 coordinates as needed per plot if prediction lines 
+# slide upward or downward and overlap your text labels.
+
+# --- TRACK 1: METABOLIC (Glutamate) ---
+plot_precuneus <- generate_trajectory_plot(
+  model_obj   = mixed_model_precuneus, 
+  var_name    = "m_m_precuneus_z", 
+  title_text  = "Continuous Cognitive Trajectories: Precuneus Glutamate", 
+  legend_text = "Baseline Precuneus Glu",
+  y1 = 23.4, y2 = 22.7, y3 = 22.0
+)
+
+plot_acc <- generate_trajectory_plot(
+  model_obj   = mixed_model_acc, 
+  var_name    = "m_m_acc_z", 
+  title_text  = "Continuous Cognitive Trajectories: ACC Glutamate", 
+  legend_text = "Baseline ACC Glutamate",
+  y1 = 23.4, y2 = 22.7, y3 = 22.0
+)
+
+
+# --- TRACK 2: FLUID (Pathology) ---
+plot_ptau217 <- generate_trajectory_plot(
+  model_obj   = mixed_model_ptau217, 
+  var_name    = "plasma_ptau217_z", 
+  title_text  = "Continuous Cognitive Trajectories: Plasma p-Tau217", 
+  legend_text = "Baseline Plasma p-Tau",
+  y1 = 23.4, y2 = 22.7, y3 = 22.0
+)
+
+
+# --- TRACK 3: STRUCTURAL (Atrophy) ---
+plot_thickness <- generate_trajectory_plot(
+  model_obj   = mixed_model_thickness, 
+  var_name    = "cortical_thickness_adsignature_dickson_z", 
+  title_text  = "Continuous Cognitive Trajectories: Cortical Thickness", 
+  legend_text = "Baseline Thickness",
+  y1 = 23.4, y2 = 22.7, y3 = 22.0
+)
+
+plot_hipp_vol <- generate_trajectory_plot(
+  model_obj   = mixed_model_hipp_mean, 
+  var_name    = "hipp_mean_z", 
+  title_text  = "Continuous Cognitive Trajectories: Hippocampal Volume", 
+  legend_text = "Baseline Hipp Volume",
+  y1 = 23.4, y2 = 22.7, y3 = 22.0
+)
+
+
+# --- TRACK 4: FUNCTIONAL (fMRI Activation) ---
+plot_hipp_act <- generate_trajectory_plot(
+  model_obj   = mixed_model_hipp_mean_act, 
+  var_name    = "hipp_mean_act_z", 
+  title_text  = "Continuous Cognitive Trajectories: Hippocampal Activation", 
+  legend_text = "Baseline Hipp Activation",
+  y1 = 23.4, y2 = 22.7, y3 = 22.0
+)
+
+plot_parietal_act <- generate_trajectory_plot(
+  model_obj   = mixed_model_activation_parietal_l, 
+  var_name    = "activation_parietal_sup_l_z", 
+  title_text  = "Continuous Cognitive Trajectories: Left Parietal Activation", 
+  legend_text = "Baseline Parietal Act",
+  y1 = 23.4, y2 = 22.7, y3 = 22.0
+)
+
+
+# ==============================================================================
+# 3. DISPLAY OR SAVE CHOSEN TARGET PLOTS
+# ==============================================================================
+# To view a plot instantly in RStudio, just call its object:
+print(plot_ptau217)
+print(plot_acc)
+print(plot_precuneus)
+print(plot_thickness)
+print(plot_hipp_vol)
+print(plot_hipp_act)
+print(plot_parietal_act)
+
+
+
+
+
+# Example for your Precuneus model
+model_sum <- summary(mixed_model_precuneus)
+interaction_coef <- round(model_sum$coefficients["years_from_baseline:m_m_precuneus_z", "Estimate"], 3)
+interaction_p    <- round(model_sum$coefficients["years_from_baseline:m_m_precuneus_z", "Pr(>|t|)"], 4)
+
+cat("Precuneus Glutamate Interaction Slope:", interaction_coef, "\n")
+cat("Precuneus Glutamate Interaction p-value:", interaction_p, "\n")
+
+
+
+library(emmeans)
+
+# --- 1. Hippocampal Activation ---
+# This calculates the slope of MoCA decline at -1 SD, Mean, and +1 SD
+hipp_slopes <- emtrends(mixed_model_hipp_mean_act, 
+                        specs = ~ hipp_mean_act_z, 
+                        var = "years_from_baseline", 
+                        at = list(hipp_mean_act_z = c(-1, 0, 1)))
+
+# This table shows the p-value for the slope of each group
+summary(hipp_slopes, infer = TRUE)
+
+# --- 2. Parietal Activation ---
+parietal_slopes <- emtrends(mixed_model_activation_parietal_l, 
+                            specs = ~ activation_parietal_sup_l_z, 
+                            var = "years_from_baseline", 
+                            at = list(activation_parietal_sup_l_z = c(-1, 0, 1)))
+
+summary(parietal_slopes, infer = TRUE)
+
+
+
+
+
+
+library(emmeans)
+
+# --- 1. Hippocampal Activation ---
+# This calculates the slope of MoCA decline at -1 SD, Mean, and +1 SD
+hipp_slopes <- emtrends(mixed_model_hipp_mean_act, 
+                        specs = ~ hipp_mean_act_z, 
+                        var = "years_from_baseline", 
+                        at = list(hipp_mean_act_z = c(-1, 0, 1)))
+
+# This table shows the p-value for the slope of each group
+summary(hipp_slopes, infer = TRUE)
+
+# --- 2. Parietal Activation ---
+parietal_slopes <- emtrends(mixed_model_activation_parietal_l, 
+                            specs = ~ activation_parietal_sup_l_z, 
+                            var = "years_from_baseline", 
+                            at = list(activation_parietal_sup_l_z = c(-1, 0, 1)))
+
+summary(parietal_slopes, infer = TRUE)
 
 #### ACC ####
 library(dplyr)

@@ -92,8 +92,13 @@ MRS_prediction$activation_hippocampus_l_z <- scale(MRS_prediction$activation_hip
 MRS_prediction$hipp_mean_act_z <- scale(MRS_prediction$hipp_mean_act)
 MRS_prediction$activation_parietal_sup_l_z <- scale(MRS_prediction$activation_parietal_sup_l)
 
+
+
+
+## Long format 
 X2026_06_16_MRS_prediction_long <- read_excel("C:/Users/okkam/Desktop/labo/article 2/Longitudinal_Multimodal_Data_CIMAQ/article_prediction/2026-06-16_MRS_prediction_long.xlsx")
 MRS_prediction_long <- X2026_06_16_MRS_prediction_long
+MRS_prediction_long$initiale_age <- MRS_prediction$initiale_age[match(MRS_prediction_long$pscid, MRS_prediction$pscid)]
 
 
 
@@ -186,12 +191,12 @@ summary(aov(activation_parietal_sup_l ~ diagnostic_nick, data = MRS_prediction))
 
 #sink()
 
-
 ############################ Objective 1 #######################
-names(MRS_prediction)
+names(MRS_prediction_long)
+
 #sink("objective_1_outputs.txt")
 # Moca slope as continous
-summary(lm(slope_moca_raw ~ m_m_precuneus, data = MRS_prediction))
+summary(lm(slope_moca_raw ~ m_m_precuneus , data = MRS_prediction))
 summary(lm(slope_moca_raw ~ m_m_acc, data = MRS_prediction))
 summary(lm(slope_moca_raw ~ plasma_ptau217 + age_difference, data = MRS_prediction))
 summary(lm(slope_moca_raw ~ cortical_thickness_adsignature_dickson, data = MRS_prediction))
@@ -205,76 +210,198 @@ summary(lm(slope_moca_raw ~ activation_parietal_sup_l, data = MRS_prediction))
 names(MRS_prediction_long)
 # Mixed-Effects Models
 #   Glutamate 
-mixed_model_precuneus <- lmer(moca ~ years_from_baseline * m_m_precuneus_z + sexe + diagnostic_nick + education +  (1 | pscid),  
+mixed_model_precuneus <- lmer(moca ~ years_from_baseline * m_m_precuneus_z + sexe + diagnostic_nick + education + initiale_age + (1 | pscid),  
   data = MRS_prediction_long)
 summary(mixed_model_precuneus)
 
-mixed_model_acc <- lmer(moca ~ years_from_baseline * m_m_acc_z + + sexe + diagnostic_nick + education +(1 | pscid),  
+precuneus_slopes <- emtrends(mixed_model_precuneus, specs = ~ m_m_precuneus_z, 
+                            var = "years_from_baseline", 
+                            at = list(m_m_precuneus_z = c(-1, 0, 1)))
+summary(precuneus_slopes, infer = TRUE)
+anova(mixed_model_precuneus)
+
+
+mixed_model_acc <- lmer(moca ~ years_from_baseline * m_m_acc_z + + sexe + diagnostic_nick + education + initiale_age + (1 | pscid),  
   data = MRS_prediction_long)
 summary(mixed_model_acc)
 
 
 #   pTau217 
-mixed_model_ptau217 <- lmer(moca ~ years_from_baseline * plasma_ptau217_z + age_difference + sexe + diagnostic_nick + education + (1 | pscid),  
+mixed_model_ptau217 <- lmer(moca ~ years_from_baseline * plasma_ptau217_z + age_difference + sexe + diagnostic_nick + education + initiale_age +(1 | pscid),  
   data = MRS_prediction_long)
 summary(mixed_model_ptau217)
 
 # Structure
 mixed_model_thickness <- lmer(
-  moca ~ years_from_baseline * cortical_thickness_adsignature_dickson_z + + sexe + diagnostic_nick + education +(1 | pscid),  
+  moca ~ years_from_baseline * cortical_thickness_adsignature_dickson_z + + sexe + diagnostic_nick + education + initiale_age + (1 | pscid),  
   data = MRS_prediction_long)
 summary(mixed_model_thickness)
 
-mixed_model_hipp_mean <- lmer(moca ~ years_from_baseline * hipp_mean_z + + sexe + diagnostic_nick + education + (1 | pscid),  
+mixed_model_hipp_mean <- lmer(moca ~ years_from_baseline * hipp_mean_z + + sexe + diagnostic_nick + education + initiale_age + (1 | pscid),  
   data = MRS_prediction_long)
 summary(mixed_model_hipp_mean)
 
 # Activation 
-mixed_model_hipp_mean_act <- lmer(moca ~ years_from_baseline * hipp_mean_act_z + + sexe + diagnostic_nick + education + (1 | pscid),  
+# Hipp
+mixed_model_hipp_mean_act <- lmer(moca ~ years_from_baseline * hipp_mean_act_z + + sexe + diagnostic_nick + education + initiale_age + (1 | pscid),  
   data = MRS_prediction_long)
 summary(mixed_model_hipp_mean_act)
 
+hipp_act_slopes <- emtrends(mixed_model_hipp_mean_act, specs = ~ hipp_mean_act_z, 
+                        var = "years_from_baseline", 
+                        at = list(hipp_mean_act_z = c(-1, 0, 1)))
+summary(hipp_act_slopes, infer = TRUE)
+
 mixed_model_activation_parietal_l <- lmer(moca ~ years_from_baseline * activation_parietal_sup_l_z + + sexe + diagnostic_nick + education +
-                                            (1 | pscid),data = MRS_prediction_long)
+                                            initiale_age + (1 | pscid),data = MRS_prediction_long)
 summary(mixed_model_activation_parietal_l)
+
 
 #sink()
 
 
-#   Glutamate 
-mixed_model_precuneus <- lmer(moca ~ years_from_baseline * plasma_ptau217_z  +  (1  | pscid),  
-                              data = MRS_prediction_long)
-summary(mixed_model_precuneus)
 
-mixed_model_acc <- lmer(moca ~ years_from_baseline * m_m_acc_z + (1 | pscid),  
-                        data = MRS_prediction_long)
-summary(mixed_model_acc)
 
-#   pTau217 + acc 
-mixed_model_ptau217 <- lmer(moca ~ years_from_baseline * plasma_ptau217_z + age_difference + (1 | pscid),  
-                            data = MRS_prediction_long)
-summary(mixed_model_ptau217)
 
-# Structure
-mixed_model_thickness <- lmer(
-  moca ~ years_from_baseline * cortical_thickness_adsignature_dickson_z + (1 | pscid),  
-  data = MRS_prediction_long)
-summary(mixed_model_thickness)
+## Hierarchical multimodal  
+library(lmerTest)
+library(lmerTest)
 
-mixed_model_hipp_mean <- lmer(moca ~ years_from_baseline * hipp_mean_z + (1 | pscid),  
-                              data = MRS_prediction_long)
-summary(mixed_model_hipp_mean)
+library(lmerTest)
 
-# Activation 
-mixed_model_hipp_mean_act <- lmer(moca ~ years_from_baseline * hipp_mean_act_z + (1 | pscid),  
-                                  data = MRS_prediction_long)
-summary(mixed_model_hipp_mean_act)
+# ==============================================================================
+# STEP 1: MAXIMIZE SAMPLE SIZES BY SPLITTING DATA ENTRIES
+# ==============================================================================
 
-mixed_model_activation_parietal_l <- lmer(moca ~ years_from_baseline * activation_parietal_sup_l_z + 
-                                            (1 | pscid),data = MRS_prediction_long)
-summary(mixed_model_activation_parietal_l)
+# Data Pool 1: Complete across demographics, structure, and metabolic markers.
+# (Maximized sample size for non-Tau models)
+df_mrs <- MRS_prediction_long[complete.cases(
+  MRS_prediction_long[, c("moca", "years_from_baseline", "pscid", "sexe", 
+                          "diagnostic_nick", "education", "initiale_age",
+                          "cortical_thickness_adsignature_dickson_z", 
+                          "m_m_precuneus_z", "m_m_acc_z")]
+), ]
 
-names(MRS_prediction)
+# Data Pool 2: Complete across ALL variables including pathology.
+# (Drops the 28 missing participants ONLY for models containing Tau)
+df_tau <- df_mrs[complete.cases(
+  df_mrs[, c("plasma_ptau217_z", "age_difference")]
+), ]
+
+
+# ==============================================================================
+# STEP 2: RUN SHARED UNIMODAL MODELS
+# ==============================================================================
+
+# Unimodal Structure (Uses Maximized Sample Size)
+uni_structure <- lmer(
+  moca ~ years_from_baseline * cortical_thickness_adsignature_dickson_z + 
+    sexe + diagnostic_nick + education + initiale_age + (1 | pscid),  
+  data = df_mrs
+)
+summary(uni_structure)
+
+# Unimodal Fluid Pathology (Drops the 28 missing participants)
+uni_pathology <- lmer(
+  moca ~ years_from_baseline * plasma_ptau217_z + age_difference +
+    sexe + diagnostic_nick + education + initiale_age + (1 | pscid),  
+  data = df_tau
+)
+summary(uni_pathology)
+
+
+# ==============================================================================
+# STEP 3: TRACK A - ALL PRECUNEUS COMBINATIONS
+# ==============================================================================
+
+### --- Unimodal Metabolic ---
+uni_precuneus <- lmer(
+  moca ~ years_from_baseline * m_m_precuneus_z + 
+    sexe + diagnostic_nick + education + initiale_age + (1 | pscid),  
+  data = df_mrs
+)
+summary(uni_precuneus)
+
+### --- Bimodal Combination 1: Structure + Metabolism (Maximized Sample) ---
+bi_struct_precuneus <- lmer(
+  moca ~ years_from_baseline * cortical_thickness_adsignature_dickson_z + 
+    years_from_baseline * m_m_precuneus_z + 
+    sexe + diagnostic_nick + education + initiale_age + (1 | pscid),  
+  data = df_mrs
+)
+summary(bi_struct_precuneus)
+
+### --- Bimodal Combination 2: Structure + Pathology (Drops Missing Tau) ---
+bi_struct_pathology <- lmer(
+  moca ~ years_from_baseline * cortical_thickness_adsignature_dickson_z + 
+    years_from_baseline * plasma_ptau217_z + age_difference + 
+    sexe + diagnostic_nick + education + initiale_age + (1 | pscid),  
+  data = df_tau
+)
+summary(bi_struct_pathology)
+
+### --- Bimodal Combination 3: Metabolism + Pathology (Drops Missing Tau) ---
+bi_precuneus_pathology <- lmer(
+  moca ~ years_from_baseline * m_m_precuneus_z + 
+    years_from_baseline * plasma_ptau217_z + age_difference + 
+    sexe + diagnostic_nick + education + initiale_age + (1 | pscid),  
+  data = df_tau
+)
+summary(bi_precuneus_pathology)
+
+### --- Trimodal Combination: Structure + Metabolism + Pathology (Drops Missing Tau) ---
+tri_multimodal_precuneus <- lmer(
+  moca ~ years_from_baseline * cortical_thickness_adsignature_dickson_z + 
+    years_from_baseline * plasma_ptau217_z + 
+    years_from_baseline * m_m_precuneus_z + age_difference + 
+    sexe + diagnostic_nick + education + initiale_age + (1 | pscid),  
+  data = df_tau
+)
+summary(tri_multimodal_precuneus)
+
+
+# ==============================================================================
+# STEP 4: TRACK B - ALL ACC COMBINATIONS
+# ==============================================================================
+
+### --- Unimodal Metabolic ---
+uni_acc <- lmer(
+  moca ~ years_from_baseline * m_m_acc_z + 
+    sexe + diagnostic_nick + education + initiale_age + (1 | pscid),  
+  data = df_mrs
+)
+summary(uni_acc)
+
+### --- Bimodal Combination 1: Structure + Metabolism (Maximized Sample) ---
+bi_struct_acc <- lmer(
+  moca ~ years_from_baseline * cortical_thickness_adsignature_dickson_z + 
+    years_from_baseline * m_m_acc_z + 
+    sexe + diagnostic_nick + education + initiale_age + (1 | pscid),  
+  data = df_mrs
+)
+summary(bi_struct_acc)
+
+### --- Bimodal Combination 2: Metabolism + Pathology (Drops Missing Tau) ---
+bi_acc_pathology <- lmer(
+  moca ~ years_from_baseline * m_m_acc_z + 
+    years_from_baseline * plasma_ptau217_z + age_difference + 
+    sexe + diagnostic_nick + education + initiale_age + (1 | pscid),  
+  data = df_tau
+)
+summary(bi_acc_pathology)
+
+### --- Trimodal Combination: Structure + Metabolism + Pathology (Drops Missing Tau) ---
+tri_multimodal_acc <- lmer(
+  moca ~ years_from_baseline * cortical_thickness_adsignature_dickson_z + 
+    years_from_baseline * plasma_ptau217_z + 
+    years_from_baseline * m_m_acc_z + age_difference + 
+    sexe + diagnostic_nick + education + initiale_age + (1 | pscid),  
+  data = df_tau
+)
+summary(tri_multimodal_acc)
+
+
+
 ################# Logistic regression ######################
 # plasma_ptau217 
 model_glu_ptau217 <- glm(decliners ~ plasma_ptau217_z, data = MRS_prediction, family = "binomial")
