@@ -7,7 +7,7 @@ library(emmeans)
 library(lme4)
 library(lmerTest) 
 library(pROC)
-
+library(openxlsx)
 
 ## Predicting cognitive change using metabolic, tau, functional and structural predictors  ######
 ## Arsenii Prozorov 
@@ -94,16 +94,24 @@ MRS_prediction$activation_parietal_sup_l_z <- scale(MRS_prediction$activation_pa
 
 
 
-
 ## Long format 
-X2026_06_16_MRS_prediction_long <- read_excel("C:/Users/okkam/Desktop/labo/article 2/Longitudinal_Multimodal_Data_CIMAQ/article_prediction/2026-06-16_MRS_prediction_long.xlsx")
+X2026_06_16_MRS_prediction_long <- read_excel("C:/Users/okkam/Desktop/MRS_prediction_longitudinal_master.xlsx")
 MRS_prediction_long <- X2026_06_16_MRS_prediction_long
-MRS_prediction_long$initiale_age <- MRS_prediction$initiale_age[match(MRS_prediction_long$pscid, MRS_prediction$pscid)]
+lapply(MRS_prediction_long,class)
 
 
+# Extract moca slopes for each participant 
+raw_individual_models <- lmList(moca ~ years_from_baseline | pscid, data = MRS_prediction_long)
+raw_slopes <- coef(raw_individual_models)
+raw_slopes$pscid <- rownames(raw_slopes)
+raw_slopes$moca_change_3_5_yrs <- raw_slopes$years_from_baseline * 3.5
 
 
 ######################################### Analyses #######################################
+names(MRS_prediction)
+
+
+
 ######### Characterization ###############
 #sink("demographic.txt")
 # Table 1: Sociodemographic & Clinical Characteristics
@@ -193,6 +201,7 @@ summary(aov(activation_parietal_sup_l ~ diagnostic_nick, data = MRS_prediction))
 
 ############################ Objective 1 #######################
 names(MRS_prediction_long)
+names(MRS_prediction)
 
 #sink("objective_1_outputs.txt")
 # Moca slope as continous
@@ -204,9 +213,16 @@ summary(lm(slope_moca_raw ~ hipp_mean, data = MRS_prediction))
 summary(lm(slope_moca_raw ~ hipp_mean_act, data = MRS_prediction))
 summary(lm(slope_moca_raw ~ activation_parietal_sup_l, data = MRS_prediction))
 
+summary(lm(slope_regression ~ m_m_precuneus , data = MRS_prediction))
+summary(lm(slope_regression ~ m_m_acc, data = MRS_prediction))
+summary(lm(slope_regression ~ plasma_ptau217, data = MRS_prediction))
+summary(lm(slope_regression ~ cortical_thickness_adsignature_dickson, data = MRS_prediction))
+summary(lm(slope_regression ~ hipp_mean, data = MRS_prediction))
+summary(lm(slope_regression ~ arsenii_hippocampus_avg_act, data = MRS_prediction))
+summary(lm(slope_regression ~ arsenii_parietal_sup_l_act, data = MRS_prediction))
+
 
 ## same with LMM
-
 names(MRS_prediction_long)
 # Mixed-Effects Models
 #   Glutamate 
@@ -241,9 +257,10 @@ mixed_model_hipp_mean <- lmer(moca ~ years_from_baseline * hipp_mean_z + + sexe 
   data = MRS_prediction_long)
 summary(mixed_model_hipp_mean)
 
+names(MRS_prediction_long)
 # Activation 
 # Hipp
-mixed_model_hipp_mean_act <- lmer(moca ~ years_from_baseline * hipp_mean_act_z + + sexe + diagnostic_nick + education + initiale_age + (1 | pscid),  
+mixed_model_hipp_mean_act <- lmer(moca ~ years_from_baseline * arsenii_hippocampus_avg_act + + sexe + diagnostic_nick + education + initiale_age + (1 | pscid),  
   data = MRS_prediction_long)
 summary(mixed_model_hipp_mean_act)
 
@@ -252,7 +269,7 @@ hipp_act_slopes <- emtrends(mixed_model_hipp_mean_act, specs = ~ hipp_mean_act_z
                         at = list(hipp_mean_act_z = c(-1, 0, 1)))
 summary(hipp_act_slopes, infer = TRUE)
 
-mixed_model_activation_parietal_l <- lmer(moca ~ years_from_baseline * activation_parietal_sup_l_z + + sexe + diagnostic_nick + education +
+mixed_model_activation_parietal_l <- lmer(moca ~ years_from_baseline * arsenii_parietal_sup_l_act + + sexe + diagnostic_nick + education +
                                             initiale_age + (1 | pscid),data = MRS_prediction_long)
 summary(mixed_model_activation_parietal_l)
 
@@ -264,151 +281,18 @@ summary(mixed_model_activation_parietal_l)
 
 
 ## Hierarchical multimodal  
-library(lmerTest)
-library(lmerTest)
-
-library(lmerTest)
-
-# ==============================================================================
-# STEP 1: MAXIMIZE SAMPLE SIZES BY SPLITTING DATA ENTRIES
-# ==============================================================================
-
-# Data Pool 1: Complete across demographics, structure, and metabolic markers.
-# (Maximized sample size for non-Tau models)
-df_mrs <- MRS_prediction_long[complete.cases(
-  MRS_prediction_long[, c("moca", "years_from_baseline", "pscid", "sexe", 
-                          "diagnostic_nick", "education", "initiale_age",
-                          "cortical_thickness_adsignature_dickson_z", 
-                          "m_m_precuneus_z", "m_m_acc_z")]
-), ]
-
-# Data Pool 2: Complete across ALL variables including pathology.
-# (Drops the 28 missing participants ONLY for models containing Tau)
-df_tau <- df_mrs[complete.cases(
-  df_mrs[, c("plasma_ptau217_z", "age_difference")]
-), ]
-
-
-# ==============================================================================
-# STEP 2: RUN SHARED UNIMODAL MODELS
-# ==============================================================================
-
-# Unimodal Structure (Uses Maximized Sample Size)
-uni_structure <- lmer(
-  moca ~ years_from_baseline * cortical_thickness_adsignature_dickson_z + 
-    sexe + diagnostic_nick + education + initiale_age + (1 | pscid),  
-  data = df_mrs
-)
-summary(uni_structure)
-
-# Unimodal Fluid Pathology (Drops the 28 missing participants)
-uni_pathology <- lmer(
-  moca ~ years_from_baseline * plasma_ptau217_z + age_difference +
-    sexe + diagnostic_nick + education + initiale_age + (1 | pscid),  
-  data = df_tau
-)
-summary(uni_pathology)
-
-
-# ==============================================================================
-# STEP 3: TRACK A - ALL PRECUNEUS COMBINATIONS
-# ==============================================================================
-
-### --- Unimodal Metabolic ---
-uni_precuneus <- lmer(
-  moca ~ years_from_baseline * m_m_precuneus_z + 
-    sexe + diagnostic_nick + education + initiale_age + (1 | pscid),  
-  data = df_mrs
-)
-summary(uni_precuneus)
-
-### --- Bimodal Combination 1: Structure + Metabolism (Maximized Sample) ---
-bi_struct_precuneus <- lmer(
-  moca ~ years_from_baseline * cortical_thickness_adsignature_dickson_z + 
-    years_from_baseline * m_m_precuneus_z + 
-    sexe + diagnostic_nick + education + initiale_age + (1 | pscid),  
-  data = df_mrs
-)
-summary(bi_struct_precuneus)
-
-### --- Bimodal Combination 2: Structure + Pathology (Drops Missing Tau) ---
-bi_struct_pathology <- lmer(
-  moca ~ years_from_baseline * cortical_thickness_adsignature_dickson_z + 
-    years_from_baseline * plasma_ptau217_z + age_difference + 
-    sexe + diagnostic_nick + education + initiale_age + (1 | pscid),  
-  data = df_tau
-)
-summary(bi_struct_pathology)
-
-### --- Bimodal Combination 3: Metabolism + Pathology (Drops Missing Tau) ---
-bi_precuneus_pathology <- lmer(
-  moca ~ years_from_baseline * m_m_precuneus_z + 
-    years_from_baseline * plasma_ptau217_z + age_difference + 
-    sexe + diagnostic_nick + education + initiale_age + (1 | pscid),  
-  data = df_tau
-)
-summary(bi_precuneus_pathology)
-
-### --- Trimodal Combination: Structure + Metabolism + Pathology (Drops Missing Tau) ---
-tri_multimodal_precuneus <- lmer(
-  moca ~ years_from_baseline * cortical_thickness_adsignature_dickson_z + 
-    years_from_baseline * plasma_ptau217_z + 
-    years_from_baseline * m_m_precuneus_z + age_difference + 
-    sexe + diagnostic_nick + education + initiale_age + (1 | pscid),  
-  data = df_tau
-)
-summary(tri_multimodal_precuneus)
-
-
-# ==============================================================================
-# STEP 4: TRACK B - ALL ACC COMBINATIONS
-# ==============================================================================
-
-### --- Unimodal Metabolic ---
-uni_acc <- lmer(
-  moca ~ years_from_baseline * m_m_acc_z + 
-    sexe + diagnostic_nick + education + initiale_age + (1 | pscid),  
-  data = df_mrs
-)
-summary(uni_acc)
-
-### --- Bimodal Combination 1: Structure + Metabolism (Maximized Sample) ---
-bi_struct_acc <- lmer(
-  moca ~ years_from_baseline * cortical_thickness_adsignature_dickson_z + 
-    years_from_baseline * m_m_acc_z + 
-    sexe + diagnostic_nick + education + initiale_age + (1 | pscid),  
-  data = df_mrs
-)
-summary(bi_struct_acc)
-
-### --- Bimodal Combination 2: Metabolism + Pathology (Drops Missing Tau) ---
-bi_acc_pathology <- lmer(
-  moca ~ years_from_baseline * m_m_acc_z + 
-    years_from_baseline * plasma_ptau217_z + age_difference + 
-    sexe + diagnostic_nick + education + initiale_age + (1 | pscid),  
-  data = df_tau
-)
-summary(bi_acc_pathology)
-
-### --- Trimodal Combination: Structure + Metabolism + Pathology (Drops Missing Tau) ---
-tri_multimodal_acc <- lmer(
-  moca ~ years_from_baseline * cortical_thickness_adsignature_dickson_z + 
-    years_from_baseline * plasma_ptau217_z + 
-    years_from_baseline * m_m_acc_z + age_difference + 
-    sexe + diagnostic_nick + education + initiale_age + (1 | pscid),  
-  data = df_tau
-)
-summary(tri_multimodal_acc)
 
 
 
 ################# Logistic regression ######################
+names(MRS_prediction)
 # plasma_ptau217 
 model_glu_ptau217 <- glm(decliners ~ plasma_ptau217_z, data = MRS_prediction, family = "binomial")
 summary(model_glu_ptau217)
 roc_ptau217 <- roc(model_glu_ptau217$y, fitted(model_glu_ptau217))
 auc(roc_ptau217)
 coords(roc_ptau217, "best", ret=c("threshold", "specificity", "sensitivity"), best.method="youden")
+
 
 
 # Precuneus Glutamate
@@ -455,6 +339,7 @@ coords(roc_func_par, "best", ret=c("threshold", "specificity", "sensitivity"), b
 
 
 
+names(MRS_prediction)
 ############ 2 Variable Models ##############
 
 # 1. Plasma p-Tau217 and ACC Glutamate
@@ -533,6 +418,294 @@ summary(model_prec_acc)
 roc_prec_acc <- roc(model_prec_acc$y, fitted(model_prec_acc))
 auc(roc_prec_acc)
 coords(roc_prec_acc, "best", ret=c("threshold", "specificity", "sensitivity"), best.method="youden")
+
+
+
+########################## Byase approach #################################
+
+library(arm)
+library(pROC)
+
+
+
+
+
+
+# 3. Run the Stabilized Bayesian Logistic Regression (Fully Adjusted)
+# This includes ALL the covariates from your LMMs (Age, Sex, Education, MCI/SCD)
+model_bayesglm_ptau <- bayesglm(decliners ~ plasma_ptau217_z + initiale_age + sexe + education + diagnostic_nick, 
+                                data = MRS_prediction, 
+                                family = binomial(link = "logit"))
+
+# 4. View the stabilized coefficients
+summary(model_bayesglm_ptau)
+
+# 5. Extract the ROC metrics for the fully adjusted model
+bayesian_probs <- predict(model_bayesglm_ptau, type = "response")
+actual_decliners <- model.frame(model_bayesglm_ptau)$decliners
+roc_bglm <- roc(actual_decliners, bayesian_probs)
+
+print(paste("Fully Adjusted Bayesian AUC:", auc(roc_bglm)))
+coords(roc_bglm, "best", ret = c("threshold", "specificity", "sensitivity"), best.method = "youden")
+
+
+
+# Load required packages
+library(arm)
+library(pROC)
+
+# =========================================================================
+# 1. Precuneus Glutamate (Fully Adjusted)
+# =========================================================================
+model_bayes_prec <- bayesglm(decliners ~ m_m_precuneus_z + initiale_age + sexe + education + diagnostic_nick, 
+                             data = MRS_prediction, family = binomial(link = "logit"))
+summary(model_bayes_prec)
+
+probs_prec <- predict(model_bayes_prec, type = "response")
+actual_prec <- model.frame(model_bayes_prec)$decliners
+roc_bayes_prec <- roc(actual_prec, probs_prec)
+
+print(paste("Precuneus Adjusted AUC:", auc(roc_bayes_prec)))
+coords(roc_bayes_prec, "best", ret=c("threshold", "specificity", "sensitivity"), best.method="youden")
+
+# =========================================================================
+# 2. ACC Glutamate (Fully Adjusted)
+# =========================================================================
+model_bayes_acc <- bayesglm(decliners ~ m_m_acc_z + initiale_age + sexe + education + diagnostic_nick, 
+                            data = MRS_prediction, family = binomial(link = "logit"))
+summary(model_bayes_acc)
+
+probs_acc <- predict(model_bayes_acc, type = "response")
+actual_acc <- model.frame(model_bayes_acc)$decliners
+roc_bayes_acc <- roc(actual_acc, probs_acc)
+
+print(paste("ACC Adjusted AUC:", auc(roc_bayes_acc)))
+coords(roc_bayes_acc, "best", ret=c("threshold", "specificity", "sensitivity"), best.method="youden")
+
+# =========================================================================
+# 3. Hippocampal Volume (Fully Adjusted)
+# =========================================================================
+model_bayes_hip_vol <- bayesglm(decliners ~ hipp_mean_z + initiale_age + sexe + education + diagnostic_nick, 
+                                data = MRS_prediction, family = binomial(link = "logit"))
+summary(model_bayes_hip_vol)
+
+probs_hip_vol <- predict(model_bayes_hip_vol, type = "response")
+actual_hip_vol <- model.frame(model_bayes_hip_vol)$decliners
+roc_bayes_hip_vol <- roc(actual_hip_vol, probs_hip_vol)
+
+print(paste("Hippocampal Volume Adjusted AUC:", auc(roc_bayes_hip_vol)))
+coords(roc_bayes_hip_vol, "best", ret=c("threshold", "specificity", "sensitivity"), best.method="youden")
+
+# =========================================================================
+# 4. Cortical Thickness (Fully Adjusted)
+# =========================================================================
+model_bayes_thick <- bayesglm(decliners ~ cortical_thickness_adsignature_dickson_z + initiale_age + sexe + education + diagnostic_nick, 
+                              data = MRS_prediction, family = binomial(link = "logit"))
+summary(model_bayes_thick)
+
+probs_thick <- predict(model_bayes_thick, type = "response")
+actual_thick <- model.frame(model_bayes_thick)$decliners
+roc_bayes_thick <- roc(actual_thick, probs_thick)
+
+print(paste("Cortical Thickness Adjusted AUC:", auc(roc_bayes_thick)))
+coords(roc_bayes_thick, "best", ret=c("threshold", "specificity", "sensitivity"), best.method="youden")
+
+# =========================================================================
+# 5. Hippocampal Activation (Fully Adjusted)
+# =========================================================================
+model_bayes_hip_act <- bayesglm(decliners ~ hipp_mean_act_z + initiale_age + sexe + education + diagnostic_nick, 
+                                data = MRS_prediction, family = binomial(link = "logit"))
+summary(model_bayes_hip_act)
+
+probs_hip_act <- predict(model_bayes_hip_act, type = "response")
+actual_hip_act <- model.frame(model_bayes_hip_act)$decliners
+roc_bayes_hip_act <- roc(actual_hip_act, probs_hip_act)
+
+print(paste("Hippocampal Activation Adjusted AUC:", auc(roc_bayes_hip_act)))
+coords(roc_bayes_hip_act, "best", ret=c("threshold", "specificity", "sensitivity"), best.method="youden")
+
+# =========================================================================
+# 6. Superior Parietal Activation (Fully Adjusted)
+# =========================================================================
+model_bayes_par_act <- bayesglm(decliners ~ activation_parietal_sup_l_z + initiale_age + sexe + education + diagnostic_nick, 
+                                data = MRS_prediction, family = binomial(link = "logit"))
+summary(model_bayes_par_act)
+
+probs_par_act <- predict(model_bayes_par_act, type = "response")
+actual_par_act <- model.frame(model_bayes_par_act)$decliners
+roc_bayes_par_act <- roc(actual_par_act, probs_par_act)
+
+print(paste("Superior Parietal Act Adjusted AUC:", auc(roc_bayes_par_act)))
+coords(roc_bayes_par_act, "best", ret=c("threshold", "specificity", "sensitivity"), best.method="youden")
+
+
+
+# =========================================================================
+# MULTIMODAL MODELS: BIOMARKERS + METABOLISM
+# =========================================================================
+
+# 1. Plasma p-Tau217 + ACC Glutamate
+model_ptau_acc <- bayesglm(decliners ~ plasma_ptau217_z + m_m_acc_z + initiale_age + sexe + education + diagnostic_nick, 
+                           data = MRS_prediction, family = binomial(link = "logit"))
+probs_ptau_acc <- predict(model_ptau_acc, type = "response")
+actual_ptau_acc <- model.frame(model_ptau_acc)$decliners
+roc_ptau_acc <- roc(actual_ptau_acc, probs_ptau_acc)
+print(paste("p-Tau217 + ACC AUC:", auc(roc_ptau_acc)))
+coords(roc_ptau_acc, "best", ret=c("threshold", "specificity", "sensitivity"), best.method="youden")
+
+# 2. Plasma p-Tau217 + Precuneus Glutamate
+model_ptau_prec <- bayesglm(decliners ~ plasma_ptau217_z + m_m_precuneus_z + initiale_age + sexe + education + diagnostic_nick, 
+                            data = MRS_prediction, family = binomial(link = "logit"))
+probs_ptau_prec <- predict(model_ptau_prec, type = "response")
+actual_ptau_prec <- model.frame(model_ptau_prec)$decliners
+roc_ptau_prec <- roc(actual_ptau_prec, probs_ptau_prec)
+print(paste("p-Tau217 + Precuneus AUC:", auc(roc_ptau_prec)))
+coords(roc_ptau_prec, "best", ret=c("threshold", "specificity", "sensitivity"), best.method="youden")
+
+# =========================================================================
+# MULTIMODAL MODELS: STRUCTURE + METABOLISM
+# =========================================================================
+
+# 7. Precuneus Glutamate + AD-Signature Cortical Thickness
+model_prec_thick <- bayesglm(decliners ~ m_m_precuneus_z + cortical_thickness_adsignature_dickson_z + initiale_age + sexe + education + diagnostic_nick, 
+                             data = MRS_prediction, family = binomial(link = "logit"))
+probs_prec_thick <- predict(model_prec_thick, type = "response")
+actual_prec_thick <- model.frame(model_prec_thick)$decliners
+roc_prec_thick <- roc(actual_prec_thick, probs_prec_thick)
+print(paste("Precuneus + Thickness AUC:", auc(roc_prec_thick)))
+coords(roc_prec_thick, "best", ret=c("threshold", "specificity", "sensitivity"), best.method="youden")
+
+# 8. ACC Glutamate + AD-Signature Cortical Thickness
+model_acc_thick <- bayesglm(decliners ~ m_m_acc_z + cortical_thickness_adsignature_dickson_z + initiale_age + sexe + education + diagnostic_nick, 
+                            data = MRS_prediction, family = binomial(link = "logit"))
+probs_acc_thick <- predict(model_acc_thick, type = "response")
+actual_acc_thick <- model.frame(model_acc_thick)$decliners
+roc_acc_thick <- roc(actual_acc_thick, probs_acc_thick)
+print(paste("ACC + Thickness AUC:", auc(roc_acc_thick)))
+coords(roc_acc_thick, "best", ret=c("threshold", "specificity", "sensitivity"), best.method="youden")
+
+# 9. Precuneus Glutamate + Hippocampal Volume
+model_prec_hip_vol <- bayesglm(decliners ~ m_m_precuneus_z + hipp_mean_z + initiale_age + sexe + education + diagnostic_nick, 
+                               data = MRS_prediction, family = binomial(link = "logit"))
+probs_prec_hip_vol <- predict(model_prec_hip_vol, type = "response")
+actual_prec_hip_vol <- model.frame(model_prec_hip_vol)$decliners
+roc_prec_hip_vol <- roc(actual_prec_hip_vol, probs_prec_hip_vol)
+print(paste("Precuneus + Hipp Volume AUC:", auc(roc_prec_hip_vol)))
+coords(roc_prec_hip_vol, "best", ret=c("threshold", "specificity", "sensitivity"), best.method="youden")
+
+# 10. ACC Glutamate + Hippocampal Volume
+model_acc_hip_vol <- bayesglm(decliners ~ m_m_acc_z + hipp_mean_z + initiale_age + sexe + education + diagnostic_nick, 
+                              data = MRS_prediction, family = binomial(link = "logit"))
+probs_acc_hip_vol <- predict(model_acc_hip_vol, type = "response")
+actual_acc_hip_vol <- model.frame(model_acc_hip_vol)$decliners
+roc_acc_hip_vol <- roc(actual_acc_hip_vol, probs_acc_hip_vol)
+print(paste("ACC + Hipp Volume AUC:", auc(roc_acc_hip_vol)))
+coords(roc_acc_hip_vol, "best", ret=c("threshold", "specificity", "sensitivity"), best.method="youden")
+
+# =========================================================================
+# MULTIMODAL MODELS: FUNCTIONAL ACTIVATION + METABOLISM
+# =========================================================================
+
+# 3. Precuneus Glutamate + Superior Parietal Activation
+model_prec_par_act <- bayesglm(decliners ~ m_m_precuneus_z + activation_parietal_sup_l_z + initiale_age + sexe + education + diagnostic_nick, 
+                               data = MRS_prediction, family = binomial(link = "logit"))
+probs_prec_par_act <- predict(model_prec_par_act, type = "response")
+actual_prec_par_act <- model.frame(model_prec_par_act)$decliners
+roc_prec_par_act <- roc(actual_prec_par_act, probs_prec_par_act)
+print(paste("Precuneus + Sup Parietal Act AUC:", auc(roc_prec_par_act)))
+coords(roc_prec_par_act, "best", ret=c("threshold", "specificity", "sensitivity"), best.method="youden")
+
+# 4. ACC Glutamate + Superior Parietal Activation
+model_acc_par_act <- bayesglm(decliners ~ m_m_acc_z + activation_parietal_sup_l_z + initiale_age + sexe + education + diagnostic_nick, 
+                              data = MRS_prediction, family = binomial(link = "logit"))
+probs_acc_par_act <- predict(model_acc_par_act, type = "response")
+actual_acc_par_act <- model.frame(model_acc_par_act)$decliners
+roc_acc_par_act <- roc(actual_acc_par_act, probs_acc_par_act)
+print(paste("ACC + Sup Parietal Act AUC:", auc(roc_acc_par_act)))
+coords(roc_acc_par_act, "best", ret=c("threshold", "specificity", "sensitivity"), best.method="youden")
+
+# 5. Precuneus Glutamate + Hippocampal Activation
+model_prec_hip_act <- bayesglm(decliners ~ m_m_precuneus_z + hipp_mean_act_z + initiale_age + sexe + education + diagnostic_nick, 
+                               data = MRS_prediction, family = binomial(link = "logit"))
+probs_prec_hip_act <- predict(model_prec_hip_act, type = "response")
+actual_prec_hip_act <- model.frame(model_prec_hip_act)$decliners
+roc_prec_hip_act <- roc(actual_prec_hip_act, probs_prec_hip_act)
+print(paste("Precuneus + Hipp Act AUC:", auc(roc_prec_hip_act)))
+coords(roc_prec_hip_act, "best", ret=c("threshold", "specificity", "sensitivity"), best.method="youden")
+
+# 6. ACC Glutamate + Hippocampal Activation
+model_acc_hip_act <- bayesglm(decliners ~ m_m_acc_z + hipp_mean_act_z + initiale_age + sexe + education + diagnostic_nick, 
+                              data = MRS_prediction, family = binomial(link = "logit"))
+probs_acc_hip_act <- predict(model_acc_hip_act, type = "response")
+actual_acc_hip_act <- model.frame(model_acc_hip_act)$decliners
+roc_acc_hip_act <- roc(actual_acc_hip_act, probs_acc_hip_act)
+print(paste("ACC + Hipp Act AUC:", auc(roc_acc_hip_act)))
+coords(roc_acc_hip_act, "best", ret=c("threshold", "specificity", "sensitivity"), best.method="youden")
+
+# =========================================================================
+# MULTIMODAL MODELS: DUAL METABOLISM
+# =========================================================================
+
+# 11. Precuneus Glutamate + ACC Glutamate
+model_prec_acc <- bayesglm(decliners ~ m_m_precuneus_z + m_m_acc_z + initiale_age + sexe + education + diagnostic_nick, 
+                           data = MRS_prediction, family = binomial(link = "logit"))
+probs_prec_acc <- predict(model_prec_acc, type = "response")
+actual_prec_acc <- model.frame(model_prec_acc)$decliners
+roc_prec_acc <- roc(actual_prec_acc, probs_prec_acc)
+print(paste("Precuneus + ACC AUC:", auc(roc_prec_acc)))
+coords(roc_prec_acc, "best", ret=c("threshold", "specificity", "sensitivity"), best.method="youden")
+
+
+
+
+
+library(arm)
+library(pROC)
+
+# This function automates the LOO process for any model formula
+run_loo_cv <- function(formula_str, data) {
+  n <- nrow(data)
+  predictions <- numeric(n)
+  actuals <- data$decliners
+  
+  for(i in 1:n) {
+    # Train on N-1
+    train_data <- data[-i, ]
+    test_data <- data[i, ]
+    
+    # Run the model
+    fit <- bayesglm(as.formula(formula_str), data = train_data, family = binomial(link = "logit"))
+    
+    # Predict for the 1 left out
+    predictions[i] <- predict(fit, newdata = test_data, type = "response")
+  }
+  
+  roc_loo <- roc(actuals, predictions, quiet = TRUE)
+  return(auc(roc_loo))
+}
+
+
+
+# Define your covariates
+covars <- " + initiale_age + sexe + education + diagnostic_nick"
+
+# Run for all your variables
+models_to_check <- c(
+  "decliners ~ plasma_ptau217_z",
+  "decliners ~ m_m_precuneus_z",
+  "decliners ~ m_m_acc_z",
+  "decliners ~ hipp_mean_z",
+  "decliners ~ cortical_thickness_adsignature_dickson_z",
+  "decliners ~ hipp_mean_act_z",
+  "decliners ~ activation_parietal_sup_l_z"
+)
+
+# Loop through and print results
+for (m in models_to_check) {
+  full_formula <- paste0(m, covars)
+  cv_auc <- run_loo_cv(full_formula, MRS_prediction)
+  cat(paste0("Formula: ", m, "\n   LOO AUC: ", round(cv_auc, 3), "\n\n"))
+}
 
 
 
