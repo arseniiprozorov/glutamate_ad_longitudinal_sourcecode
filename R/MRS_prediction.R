@@ -92,7 +92,7 @@ MRS_prediction$activation_hippocampus_l_z <- scale(MRS_prediction$activation_hip
 MRS_prediction$hipp_mean_act_z <- scale(MRS_prediction$hipp_mean_act)
 MRS_prediction$activation_parietal_sup_l_z <- scale(MRS_prediction$activation_parietal_sup_l)
 
-
+MRS_prediction_long$arsenii_hippocampus_avg_act_z <- scale(MRS_prediction_long$arsenii_hippocampus_avg_act)
 
 ## Long format 
 X2026_06_16_MRS_prediction_long <- read_excel("C:/Users/okkam/Desktop/MRS_prediction_longitudinal_master.xlsx")
@@ -111,12 +111,11 @@ raw_slopes$moca_change_3_5_yrs <- raw_slopes$years_from_baseline * 3.5
 names(MRS_prediction)
 
 
-
 ######### Characterization ###############
 #sink("demographic.txt")
 # Table 1: Sociodemographic & Clinical Characteristics
 # Table 1.1  Split by Decliners Status 
-jmv::descriptives(data = MRS_prediction, vars = vars(initiale_age, education, slope_moca_raw, age_difference),
+jmv::descriptives(data = MRS_prediction, vars = vars(initiale_age, education, slope_regression_yearly, age_difference),
                   sd = TRUE, iqr = TRUE, splitBy = decliners, skew = TRUE, kurt = TRUE)
 
 t.test(initiale_age ~ decliners, data = MRS_prediction)
@@ -129,12 +128,14 @@ t.test(education ~ decliners, data = MRS_prediction)
 chisq.test(MRS_prediction$diagnostic_nick, y = MRS_prediction$decliners, correct = TRUE)
 table(MRS_prediction$diagnostic_nick, MRS_prediction$decliners)
 
-t.test(slope_moca_raw ~ decliners, data = MRS_prediction)
+
+t.test(slope_regression_yearly ~ decliners, data = MRS_prediction)
+
 t.test(age_difference ~ decliners, data = MRS_prediction)
 
 
 #  Table 1.2 - Split by Baseline Diagnosis 
-jmv::descriptives(data = MRS_prediction, vars = vars(initiale_age, education, slope_moca_raw, age_difference),
+jmv::descriptives(data = MRS_prediction, vars = vars(initiale_age, education, slope_regression_yearly, age_difference),
                   sd = TRUE, iqr = TRUE, splitBy = diagnostic_nick, skew = TRUE, kurt = TRUE)
 
 summary(aov(initiale_age ~ diagnostic_nick, data = MRS_prediction))
@@ -143,7 +144,7 @@ chisq.test(MRS_prediction$sexe, y = MRS_prediction$diagnostic_nick, correct = TR
 table(MRS_prediction$sexe, MRS_prediction$diagnostic_nick)
 
 summary(aov(education ~ diagnostic_nick, data = MRS_prediction))
-summary(aov(slope_moca_raw ~ diagnostic_nick, data = MRS_prediction))
+summary(aov(slope_regression_yearly ~ diagnostic_nick, data = MRS_prediction))
 summary(aov(age_difference ~ diagnostic_nick, data = MRS_prediction))
 
 
@@ -203,23 +204,18 @@ summary(aov(activation_parietal_sup_l ~ diagnostic_nick, data = MRS_prediction))
 names(MRS_prediction_long)
 names(MRS_prediction)
 
+
 #sink("objective_1_outputs.txt")
 # Moca slope as continous
-summary(lm(slope_moca_raw ~ m_m_precuneus , data = MRS_prediction))
-summary(lm(slope_moca_raw ~ m_m_acc, data = MRS_prediction))
-summary(lm(slope_moca_raw ~ plasma_ptau217 + age_difference, data = MRS_prediction))
-summary(lm(slope_moca_raw ~ cortical_thickness_adsignature_dickson, data = MRS_prediction))
-summary(lm(slope_moca_raw ~ hipp_mean, data = MRS_prediction))
-summary(lm(slope_moca_raw ~ hipp_mean_act, data = MRS_prediction))
-summary(lm(slope_moca_raw ~ activation_parietal_sup_l, data = MRS_prediction))
 
-summary(lm(slope_regression ~ m_m_precuneus , data = MRS_prediction))
-summary(lm(slope_regression ~ m_m_acc, data = MRS_prediction))
-summary(lm(slope_regression ~ plasma_ptau217, data = MRS_prediction))
-summary(lm(slope_regression ~ cortical_thickness_adsignature_dickson, data = MRS_prediction))
-summary(lm(slope_regression ~ hipp_mean, data = MRS_prediction))
-summary(lm(slope_regression ~ arsenii_hippocampus_avg_act, data = MRS_prediction))
-summary(lm(slope_regression ~ arsenii_parietal_sup_l_act, data = MRS_prediction))
+summary(lm(slope_regression_yearly ~ m_m_precuneus , data = MRS_prediction))
+summary(lm(slope_regression_yearly ~ m_m_acc, data = MRS_prediction))
+
+summary(lm(slope_regression_yearly ~ plasma_ptau217, data = MRS_prediction))
+summary(lm(slope_regression_yearly ~ cortical_thickness_adsignature_dickson, data = MRS_prediction))
+summary(lm(slope_regression_yearly ~ hipp_mean, data = MRS_prediction))
+summary(lm(slope_regression_yearly ~ arsenii_hippocampus_avg_act, data = MRS_prediction))
+summary(lm(slope_regression_yearly ~ parietal_sup_l_act, data = MRS_prediction))
 
 
 ## same with LMM
@@ -237,9 +233,16 @@ summary(precuneus_slopes, infer = TRUE)
 anova(mixed_model_precuneus)
 
 
-mixed_model_acc <- lmer(moca ~ years_from_baseline * m_m_acc_z + + sexe + diagnostic_nick + education + initiale_age + (1 | pscid),  
+
+mixed_model_acc <- lmer(moca ~ years_from_baseline * m_m_acc_z + sexe + diagnostic_nick + education + initiale_age + (1 | pscid),  
   data = MRS_prediction_long)
 summary(mixed_model_acc)
+
+acc_slopes <- emtrends(mixed_model_acc, specs = ~ m_m_acc_z, 
+                             var = "years_from_baseline", 
+                             at = list(m_m_acc_z = c(-1, 0, 1)))
+summary(acc_slopes, infer = TRUE)
+anova(mixed_model_acc)
 
 
 #   pTau217 
@@ -247,31 +250,237 @@ mixed_model_ptau217 <- lmer(moca ~ years_from_baseline * plasma_ptau217_z + age_
   data = MRS_prediction_long)
 summary(mixed_model_ptau217)
 
+tau217_slopes <- emtrends(mixed_model_ptau217, specs = ~ plasma_ptau217_z, 
+                       var = "years_from_baseline", 
+                       at = list(plasma_ptau217_z = c(-1, 0, 1)))
+summary(tau217_slopes, infer = TRUE)
+anova(mixed_model_ptau217)
+
 # Structure
 mixed_model_thickness <- lmer(
-  moca ~ years_from_baseline * cortical_thickness_adsignature_dickson_z + + sexe + diagnostic_nick + education + initiale_age + (1 | pscid),  
+  moca ~ years_from_baseline * cortical_thickness_adsignature_dickson_z + sexe + diagnostic_nick + education + initiale_age + (1 | pscid),  
   data = MRS_prediction_long)
 summary(mixed_model_thickness)
 
-mixed_model_hipp_mean <- lmer(moca ~ years_from_baseline * hipp_mean_z + + sexe + diagnostic_nick + education + initiale_age + (1 | pscid),  
+thick_slopes <- emtrends(mixed_model_thickness, specs = ~ cortical_thickness_adsignature_dickson_z, 
+                          var = "years_from_baseline", 
+                          at = list(cortical_thickness_adsignature_dickson_z = c(-1, 0, 1)))
+summary(thick_slopes, infer = TRUE)
+anova(mixed_model_thickness)
+
+
+mixed_model_hipp_mean <- lmer(moca ~ years_from_baseline * hipp_mean_z  + sexe + diagnostic_nick + education + initiale_age + (1 | pscid),  
   data = MRS_prediction_long)
 summary(mixed_model_hipp_mean)
+
+hipp_vol_slopes <- emtrends(mixed_model_hipp_mean, specs = ~ hipp_mean_z, 
+                         var = "years_from_baseline", 
+                         at = list(hipp_mean_z = c(-1, 0, 1)))
+summary(hipp_vol_slopes, infer = TRUE)
+anova(mixed_model_hipp_mean)
+
+
+
 
 names(MRS_prediction_long)
 # Activation 
 # Hipp
-mixed_model_hipp_mean_act <- lmer(moca ~ years_from_baseline * arsenii_hippocampus_avg_act + + sexe + diagnostic_nick + education + initiale_age + (1 | pscid),  
+mixed_model_hipp_mean_act <- lmer(moca ~ years_from_baseline * hipp_mean_act_z + + sexe + diagnostic_nick + education + initiale_age + (1 | pscid),  
   data = MRS_prediction_long)
 summary(mixed_model_hipp_mean_act)
+
+mixed_model_hipp_mean_act <- lmer(moca ~ years_from_baseline * arsenii_hippocampus_avg_act_z  + + sexe + diagnostic_nick + education + initiale_age + (1 | pscid),  
+                                  data = MRS_prediction_long)
+summary(mixed_model_hipp_mean_act)
+
 
 hipp_act_slopes <- emtrends(mixed_model_hipp_mean_act, specs = ~ hipp_mean_act_z, 
                         var = "years_from_baseline", 
                         at = list(hipp_mean_act_z = c(-1, 0, 1)))
 summary(hipp_act_slopes, infer = TRUE)
 
-mixed_model_activation_parietal_l <- lmer(moca ~ years_from_baseline * arsenii_parietal_sup_l_act + + sexe + diagnostic_nick + education +
+mixed_model_activation_parietal_l <- lmer(moca ~ years_from_baseline * activation_parietal_sup_l_z + + sexe + diagnostic_nick + education +
                                             initiale_age + (1 | pscid),data = MRS_prediction_long)
 summary(mixed_model_activation_parietal_l)
+
+
+#sink()
+
+
+# The Multimodal  Model
+mixed_model_multi <- lmer(moca ~ years_from_baseline * (m_m_acc_z + m_m_precuneus_z  + cortical_thickness_adsignature_dickson_z + arsenii_hippocampus_avg_act_z) + 
+    sexe + diagnostic_nick + education + initiale_age + age_difference + (1 | pscid),  
+  data = MRS_prediction_long
+)
+summary(mixed_model_multi)
+
+
+
+################# Logistic regression ######################
+names(MRS_prediction)
+## Overal model sig
+overall_m_sig <- function(model) {
+  chsq <- model$null.deviance - model$deviance
+  df <- model$df.null - model$df.residual
+  pval <- pchisq(chsq, df, lower.tail = FALSE)
+  return(data.frame(Chi_Sq = chsq, df = df, p_value = pval))}
+#overall_m_sig(object)
+
+
+#sink("glm_models_sensetivity_decliners.txt")
+
+
+# plasma_ptau217 
+model_glu_ptau217 <- glm(decliner_regression ~ plasma_ptau217_z  , data = MRS_prediction, family = "binomial")
+summary(model_glu_ptau217)
+roc_ptau217 <- roc(model_glu_ptau217$y, fitted(model_glu_ptau217))
+auc(roc_ptau217)
+coords(roc_ptau217, "best", ret=c("threshold", "specificity", "sensitivity"), best.method="youden")
+overall_m_sig(model_glu_ptau217)
+
+# Precuneus Glutamate
+model_glu_prec <- glm(decliner_regression ~ m_m_precuneus_z  , data = MRS_prediction, family = "binomial")
+summary(model_glu_prec)
+roc_glu_prec <- roc(model_glu_prec$y, fitted(model_glu_prec))
+auc(roc_glu_prec)
+coords(roc_glu_prec, "best", ret=c("threshold", "specificity", "sensitivity"), best.method="youden")
+overall_m_sig(model_glu_prec)
+
+# ACC Glutamate
+model_glu_acc <- glm(decliner_regression ~ m_m_acc_z  , data = MRS_prediction, family = "binomial")
+summary(model_glu_acc)
+roc_glu_acc <- roc(model_glu_acc$y, fitted(model_glu_acc))
+auc(roc_glu_acc)
+coords(roc_glu_acc, "best", ret=c("threshold", "specificity", "sensitivity"), best.method="youden")
+overall_m_sig(model_glu_acc)
+
+# Hippocampal Volume
+model_struc_hip <- glm(decliner_regression ~ hipp_mean_z  , data = MRS_prediction, family = "binomial")
+summary(model_struc_hip)
+roc_struc_hip <- roc(model_struc_hip$y, fitted(model_struc_hip))
+auc(roc_struc_hip)
+coords(roc_struc_hip, "best", ret=c("threshold", "specificity", "sensitivity"), best.method="youden")
+overall_m_sig(model_struc_hip)
+
+# Cortical Thickness
+model_struc_thick <- glm(decliner_regression ~ cortical_thickness_adsignature_dickson_z  , data = MRS_prediction, family = "binomial")
+summary(model_struc_thick)
+roc_struc_thick <- roc(model_struc_thick$y, fitted(model_struc_thick))
+auc(roc_struc_thick)
+coords(roc_struc_thick, "best", ret=c("threshold", "specificity", "sensitivity"), best.method="youden")
+overall_m_sig(model_struc_thick)
+
+# Hippocampal Activation
+model_func_hip <- glm(decliner_regression ~ hipp_mean_act_z  , data = MRS_prediction, family = "binomial")
+summary(model_func_hip)
+roc_func_hip <- roc(model_func_hip$y, fitted(model_func_hip))
+auc(roc_func_hip)
+coords(roc_func_hip, "best", ret=c("threshold", "specificity", "sensitivity"), best.method="youden")
+overall_m_sig(model_func_hip)
+
+
+
+# Superior Parietal Activation
+model_func_par <- glm(decliner_regression ~ activation_parietal_sup_l_z , data = MRS_prediction, family = "binomial")
+summary(model_func_par)
+roc_func_par <- roc(model_func_par$y, fitted(model_func_par))
+auc(roc_func_par)
+coords(roc_func_par, "best", ret=c("threshold", "specificity", "sensitivity"), best.method="youden")
+overall_m_sig(model_func_par)
+
+
+
+############ 2 Variable Models ##############
+
+
+# 1. Plasma p-Tau217 and ACC Glutamate
+model_ptau217_acc <- glm(decliner_regression ~ plasma_ptau217_z + m_m_acc_z, data = MRS_prediction, family = "binomial")
+summary(model_ptau217_acc)
+roc_ptau217_acc <- roc(model_ptau217_acc$y, fitted(model_ptau217_acc))
+auc(roc_ptau217_acc)
+coords(roc_ptau217_acc, "best", ret=c("threshold", "specificity", "sensitivity"), best.method="youden")
+overall_m_sig(model_ptau217_acc)
+
+# 2. Plasma p-Tau217 and Precuneus Glutamate
+model_ptau217_prec <- glm(decliner_regression ~ plasma_ptau217_z + m_m_precuneus_z, data = MRS_prediction, family = "binomial")
+summary(model_ptau217_prec)
+roc_ptau217_prec <- roc(model_ptau217_prec$y, fitted(model_ptau217_prec))
+auc(roc_ptau217_prec)
+coords(roc_ptau217_prec, "best", ret=c("threshold", "specificity", "sensitivity"), best.method="youden")
+overall_m_sig(model_ptau217_prec)
+
+# 3. Precuneus Glutamate + AD-Signature Cortical Thickness
+model_prec_thick <- glm(decliner_regression ~ m_m_precuneus_z + cortical_thickness_adsignature_dickson_z, data = MRS_prediction, family = "binomial")
+summary(model_prec_thick)
+roc_prec_thick <- roc(model_prec_thick$y, fitted(model_prec_thick))
+auc(roc_prec_thick)
+coords(roc_prec_thick, "best", ret=c("threshold", "specificity", "sensitivity"), best.method="youden")
+overall_m_sig(model_prec_thick)
+
+# 4. ACC Glutamate + AD-Signature Cortical Thickness
+model_acc_thick <- glm(decliner_regression ~ m_m_acc_z + cortical_thickness_adsignature_dickson_z, data = MRS_prediction, family = "binomial")
+summary(model_acc_thick)
+roc_acc_thick <- roc(model_acc_thick$y, fitted(model_acc_thick))
+auc(roc_acc_thick)
+coords(roc_acc_thick, "best", ret=c("threshold", "specificity", "sensitivity"), best.method="youden")
+overall_m_sig(model_acc_thick)
+
+# 5. Precuneus Glutamate + Hippocampal Volume
+model_prec_hip_vol <- glm(decliner_regression ~ m_m_precuneus_z + hipp_mean_z, data = MRS_prediction, family = "binomial")
+summary(model_prec_hip_vol)
+roc_prec_hip_vol <- roc(model_prec_hip_vol$y, fitted(model_prec_hip_vol))
+auc(roc_prec_hip_vol)
+coords(roc_prec_hip_vol, "best", ret=c("threshold", "specificity", "sensitivity"), best.method="youden")
+overall_m_sig(model_prec_hip_vol)
+
+# 6. ACC Glutamate + Hippocampal Volume
+model_acc_hip_vol <- glm(decliner_regression ~ m_m_acc_z + hipp_mean_z, data = MRS_prediction, family = "binomial")
+summary(model_acc_hip_vol)
+roc_acc_hip_vol <- roc(model_acc_hip_vol$y, fitted(model_acc_hip_vol))
+auc(roc_acc_hip_vol)
+coords(roc_acc_hip_vol, "best", ret=c("threshold", "specificity", "sensitivity"), best.method="youden")
+overall_m_sig(model_acc_hip_vol)
+
+# 7. Precuneus Glutamate + Superior Parietal Activation
+model_prec_par_act <- glm(decliner_regression ~ m_m_precuneus_z + activation_parietal_sup_l_z, data = MRS_prediction, family = "binomial")
+summary(model_prec_par_act)
+roc_prec_par_act <- roc(model_prec_par_act$y, fitted(model_prec_par_act))
+auc(roc_prec_par_act)
+coords(roc_prec_par_act, "best", ret=c("threshold", "specificity", "sensitivity"), best.method="youden")
+overall_m_sig(model_prec_par_act)
+
+# 8. ACC Glutamate + Superior Parietal Activation
+model_acc_par_act <- glm(decliner_regression ~ m_m_acc_z + activation_parietal_sup_l_z, data = MRS_prediction, family = "binomial")
+summary(model_acc_par_act)
+roc_acc_par_act <- roc(model_acc_par_act$y, fitted(model_acc_par_act))
+auc(roc_acc_par_act)
+coords(roc_acc_par_act, "best", ret=c("threshold", "specificity", "sensitivity"), best.method="youden")
+overall_m_sig(model_acc_par_act)
+
+# 9. Precuneus Glutamate + Hippocampal Activation
+model_prec_hip_act <- glm(decliner_regression ~ m_m_precuneus_z + hipp_mean_act_z, data = MRS_prediction, family = "binomial")
+summary(model_prec_hip_act)
+roc_prec_hip_act <- roc(model_prec_hip_act$y, fitted(model_prec_hip_act))
+auc(roc_prec_hip_act)
+coords(roc_prec_hip_act, "best", ret=c("threshold", "specificity", "sensitivity"), best.method="youden")
+overall_m_sig(model_prec_hip_act)
+
+# 10. ACC Glutamate + Hippocampal Activation
+model_acc_hip_act <- glm(decliner_regression ~ m_m_acc_z + hipp_mean_act_z, data = MRS_prediction, family = "binomial")
+summary(model_acc_hip_act)
+roc_acc_hip_act <- roc(model_acc_hip_act$y, fitted(model_acc_hip_act))
+auc(roc_acc_hip_act)
+coords(roc_acc_hip_act, "best", ret=c("threshold", "specificity", "sensitivity"), best.method="youden")
+overall_m_sig(model_acc_hip_act)
+
+# 11.  Precuneus Glutamate + ACC Glutamate
+model_prec_acc <- glm(decliner_regression ~ m_m_precuneus_z + m_m_acc_z, data = MRS_prediction, family = "binomial")
+summary(model_prec_acc)
+roc_prec_acc <- roc(model_prec_acc$y, fitted(model_prec_acc))
+auc(roc_prec_acc)
+coords(roc_prec_acc, "best", ret=c("threshold", "specificity", "sensitivity"), best.method="youden")
+overall_m_sig(model_prec_acc)
+
 
 
 #sink()
@@ -280,475 +489,128 @@ summary(mixed_model_activation_parietal_l)
 
 
 
-## Hierarchical multimodal  
+
+########################### With mixed GLM #########################
+library(blme)
+library(dplyr)
+
+# Ensure data is cross-sectional
+MRS_cross_sectional <- MRS_prediction_long %>%
+  distinct(pscid, .keep_all = TRUE)
+
+# Run with a gamma prior on the random effect standard deviation
+b_model_ptau <- bglmer(
+  decliner_regression ~ plasma_ptau217_z + (1 | pscid), 
+  data = MRS_cross_sectional, 
+  family = binomial(link = "logit"),
+  fixef.prior = normal(sd = 10),                            
+  cov.prior = gamma(shape = 2, rate = 0.5, posterior.scale = "sd"), 
+  control = glmerControl(optimizer = "bobyqa", optCtrl = list(maxit = 100000)))
+
+summary(b_model_ptau)
 
 
 
-################# Logistic regression ######################
-names(MRS_prediction)
-# plasma_ptau217 
-model_glu_ptau217 <- glm(decliners ~ plasma_ptau217_z, data = MRS_prediction, family = "binomial")
-summary(model_glu_ptau217)
-roc_ptau217 <- roc(model_glu_ptau217$y, fitted(model_glu_ptau217))
-auc(roc_ptau217)
-coords(roc_ptau217, "best", ret=c("threshold", "specificity", "sensitivity"), best.method="youden")
 
-
-
-# Precuneus Glutamate
-model_glu_prec <- glm(decliners ~ m_m_precuneus_z, data = MRS_prediction, family = "binomial")
-summary(model_glu_prec)
-roc_glu_prec <- roc(model_glu_prec$y, fitted(model_glu_prec))
-auc(roc_glu_prec)
-coords(roc_glu_prec, "best", ret=c("threshold", "specificity", "sensitivity"), best.method="youden")
-
-# ACC Glutamate
-model_glu_acc <- glm(decliners ~ m_m_acc_z, data = MRS_prediction, family = "binomial")
-summary(model_glu_acc)
-roc_glu_acc <- roc(model_glu_acc$y, fitted(model_glu_acc))
-auc(roc_glu_acc)
-coords(roc_glu_acc, "best", ret=c("threshold", "specificity", "sensitivity"), best.method="youden")
-
-# Hippocampal Volume
-model_struc_hip <- glm(decliners ~ hipp_mean_z, data = MRS_prediction, family = "binomial")
-summary(model_struc_hip)
-roc_struc_hip <- roc(model_struc_hip$y, fitted(model_struc_hip))
-auc(roc_struc_hip)
-coords(roc_struc_hip, "best", ret=c("threshold", "specificity", "sensitivity"), best.method="youden")
-
-# Cortical Thickness
-model_struc_thick <- glm(decliners ~ cortical_thickness_adsignature_dickson_z, data = MRS_prediction, family = "binomial")
-summary(model_struc_thick)
-roc_struc_thick <- roc(model_struc_thick$y, fitted(model_struc_thick))
-auc(roc_struc_thick)
-coords(roc_struc_thick, "best", ret=c("threshold", "specificity", "sensitivity"), best.method="youden")
-
-# Hippocampal Activation
-model_func_hip <- glm(decliners ~ hipp_mean_act_z, data = MRS_prediction, family = "binomial")
-summary(model_func_hip)
-roc_func_hip <- roc(model_func_hip$y, fitted(model_func_hip))
-auc(roc_func_hip)
-coords(roc_func_hip, "best", ret=c("threshold", "specificity", "sensitivity"), best.method="youden")
-
-# Superior Parietal Activation
-model_func_par <- glm(decliners ~ activation_parietal_sup_l_z, data = MRS_prediction, family = "binomial")
-summary(model_func_par)
-roc_func_par <- roc(model_func_par$y, fitted(model_func_par))
-auc(roc_func_par)
-coords(roc_func_par, "best", ret=c("threshold", "specificity", "sensitivity"), best.method="youden")
-
-
-
-names(MRS_prediction)
-############ 2 Variable Models ##############
-
-# 1. Plasma p-Tau217 and ACC Glutamate
-model_ptau217_acc <- glm(decliners ~ plasma_ptau217_z + m_m_acc_z, data = MRS_prediction, family = "binomial")
-summary(model_ptau217_acc)
-roc_ptau217_acc <- roc(model_ptau217_acc$y, fitted(model_ptau217_acc))
-auc(roc_ptau217_acc)
-coords(roc_ptau217_acc, "best", ret=c("threshold", "specificity", "sensitivity"), best.method="youden")
-
-# 2. Plasma p-Tau217 and Precuneus Glutamate
-model_ptau217_prec <- glm(decliners ~ plasma_ptau217_z + m_m_precuneus_z, data = MRS_prediction, family = "binomial")
-summary(model_ptau217_prec)
-roc_ptau217_prec <- roc(model_ptau217_prec$y, fitted(model_ptau217_prec))
-auc(roc_ptau217_prec)
-coords(roc_ptau217_prec, "best", ret=c("threshold", "specificity", "sensitivity"), best.method="youden")
-
-# 7. Precuneus Glutamate + AD-Signature Cortical Thickness
-model_prec_thick <- glm(decliners ~ m_m_precuneus_z + cortical_thickness_adsignature_dickson_z, data = MRS_prediction, family = "binomial")
-summary(model_prec_thick)
-roc_prec_thick <- roc(model_prec_thick$y, fitted(model_prec_thick))
-auc(roc_prec_thick)
-coords(roc_prec_thick, "best", ret=c("threshold", "specificity", "sensitivity"), best.method="youden")
-
-# 8. ACC Glutamate + AD-Signature Cortical Thickness
-model_acc_thick <- glm(decliners ~ m_m_acc_z + cortical_thickness_adsignature_dickson_z, data = MRS_prediction, family = "binomial")
-summary(model_acc_thick)
-roc_acc_thick <- roc(model_acc_thick$y, fitted(model_acc_thick))
-auc(roc_acc_thick)
-coords(roc_acc_thick, "best", ret=c("threshold", "specificity", "sensitivity"), best.method="youden")
-
-# 9. Precuneus Glutamate + Hippocampal Volume
-model_prec_hip_vol <- glm(decliners ~ m_m_precuneus_z + hipp_mean_z, data = MRS_prediction, family = "binomial")
-summary(model_prec_hip_vol)
-roc_prec_hip_vol <- roc(model_prec_hip_vol$y, fitted(model_prec_hip_vol))
-auc(roc_prec_hip_vol)
-coords(roc_prec_hip_vol, "best", ret=c("threshold", "specificity", "sensitivity"), best.method="youden")
-
-# 10. ACC Glutamate + Hippocampal Volume
-model_acc_hip_vol <- glm(decliners ~ m_m_acc_z + hipp_mean_z, data = MRS_prediction, family = "binomial")
-summary(model_acc_hip_vol)
-roc_acc_hip_vol <- roc(model_acc_hip_vol$y, fitted(model_acc_hip_vol))
-auc(roc_acc_hip_vol)
-coords(roc_acc_hip_vol, "best", ret=c("threshold", "specificity", "sensitivity"), best.method="youden")
-
-# 3. Precuneus Glutamate + Superior Parietal Activation
-model_prec_par_act <- glm(decliners ~ m_m_precuneus_z + activation_parietal_sup_l_z, data = MRS_prediction, family = "binomial")
-summary(model_prec_par_act)
-roc_prec_par_act <- roc(model_prec_par_act$y, fitted(model_prec_par_act))
-auc(roc_prec_par_act)
-coords(roc_prec_par_act, "best", ret=c("threshold", "specificity", "sensitivity"), best.method="youden")
-
-# 4. ACC Glutamate + Superior Parietal Activation
-model_acc_par_act <- glm(decliners ~ m_m_acc_z + activation_parietal_sup_l_z, data = MRS_prediction, family = "binomial")
-summary(model_acc_par_act)
-roc_acc_par_act <- roc(model_acc_par_act$y, fitted(model_acc_par_act))
-auc(roc_acc_par_act)
-coords(roc_acc_par_act, "best", ret=c("threshold", "specificity", "sensitivity"), best.method="youden")
-
-# 5. Precuneus Glutamate + Hippocampal Activation
-model_prec_hip_act <- glm(decliners ~ m_m_precuneus_z + hipp_mean_act_z, data = MRS_prediction, family = "binomial")
-summary(model_prec_hip_act)
-roc_prec_hip_act <- roc(model_prec_hip_act$y, fitted(model_prec_hip_act))
-auc(roc_prec_hip_act)
-coords(roc_prec_hip_act, "best", ret=c("threshold", "specificity", "sensitivity"), best.method="youden")
-
-# 6. ACC Glutamate + Hippocampal Activation
-model_acc_hip_act <- glm(decliners ~ m_m_acc_z + hipp_mean_act_z, data = MRS_prediction, family = "binomial")
-summary(model_acc_hip_act)
-roc_acc_hip_act <- roc(model_acc_hip_act$y, fitted(model_acc_hip_act))
-auc(roc_acc_hip_act)
-coords(roc_acc_hip_act, "best", ret=c("threshold", "specificity", "sensitivity"), best.method="youden")
-
-# 11. Precuneus Glutamate + ACC Glutamate
-model_prec_acc <- glm(decliners ~ m_m_precuneus_z + m_m_acc_z, data = MRS_prediction, family = "binomial")
-summary(model_prec_acc)
-roc_prec_acc <- roc(model_prec_acc$y, fitted(model_prec_acc))
-auc(roc_prec_acc)
-coords(roc_prec_acc, "best", ret=c("threshold", "specificity", "sensitivity"), best.method="youden")
-
-
-
-########################## Byase approach #################################
-
-library(arm)
+############ One leave out cross validation ##############
 library(pROC)
 
-
-
-
-
-
-# 3. Run the Stabilized Bayesian Logistic Regression (Fully Adjusted)
-# This includes ALL the covariates from your LMMs (Age, Sex, Education, MCI/SCD)
-model_bayesglm_ptau <- bayesglm(decliners ~ plasma_ptau217_z + initiale_age + sexe + education + diagnostic_nick, 
-                                data = MRS_prediction, 
-                                family = binomial(link = "logit"))
-
-# 4. View the stabilized coefficients
-summary(model_bayesglm_ptau)
-
-# 5. Extract the ROC metrics for the fully adjusted model
-bayesian_probs <- predict(model_bayesglm_ptau, type = "response")
-actual_decliners <- model.frame(model_bayesglm_ptau)$decliners
-roc_bglm <- roc(actual_decliners, bayesian_probs)
-
-print(paste("Fully Adjusted Bayesian AUC:", auc(roc_bglm)))
-coords(roc_bglm, "best", ret = c("threshold", "specificity", "sensitivity"), best.method = "youden")
-
-
-
-# Load required packages
-library(arm)
-library(pROC)
-
-# =========================================================================
-# 1. Precuneus Glutamate (Fully Adjusted)
-# =========================================================================
-model_bayes_prec <- bayesglm(decliners ~ m_m_precuneus_z + initiale_age + sexe + education + diagnostic_nick, 
-                             data = MRS_prediction, family = binomial(link = "logit"))
-summary(model_bayes_prec)
-
-probs_prec <- predict(model_bayes_prec, type = "response")
-actual_prec <- model.frame(model_bayes_prec)$decliners
-roc_bayes_prec <- roc(actual_prec, probs_prec)
-
-print(paste("Precuneus Adjusted AUC:", auc(roc_bayes_prec)))
-coords(roc_bayes_prec, "best", ret=c("threshold", "specificity", "sensitivity"), best.method="youden")
-
-# =========================================================================
-# 2. ACC Glutamate (Fully Adjusted)
-# =========================================================================
-model_bayes_acc <- bayesglm(decliners ~ m_m_acc_z + initiale_age + sexe + education + diagnostic_nick, 
-                            data = MRS_prediction, family = binomial(link = "logit"))
-summary(model_bayes_acc)
-
-probs_acc <- predict(model_bayes_acc, type = "response")
-actual_acc <- model.frame(model_bayes_acc)$decliners
-roc_bayes_acc <- roc(actual_acc, probs_acc)
-
-print(paste("ACC Adjusted AUC:", auc(roc_bayes_acc)))
-coords(roc_bayes_acc, "best", ret=c("threshold", "specificity", "sensitivity"), best.method="youden")
-
-# =========================================================================
-# 3. Hippocampal Volume (Fully Adjusted)
-# =========================================================================
-model_bayes_hip_vol <- bayesglm(decliners ~ hipp_mean_z + initiale_age + sexe + education + diagnostic_nick, 
-                                data = MRS_prediction, family = binomial(link = "logit"))
-summary(model_bayes_hip_vol)
-
-probs_hip_vol <- predict(model_bayes_hip_vol, type = "response")
-actual_hip_vol <- model.frame(model_bayes_hip_vol)$decliners
-roc_bayes_hip_vol <- roc(actual_hip_vol, probs_hip_vol)
-
-print(paste("Hippocampal Volume Adjusted AUC:", auc(roc_bayes_hip_vol)))
-coords(roc_bayes_hip_vol, "best", ret=c("threshold", "specificity", "sensitivity"), best.method="youden")
-
-# =========================================================================
-# 4. Cortical Thickness (Fully Adjusted)
-# =========================================================================
-model_bayes_thick <- bayesglm(decliners ~ cortical_thickness_adsignature_dickson_z + initiale_age + sexe + education + diagnostic_nick, 
-                              data = MRS_prediction, family = binomial(link = "logit"))
-summary(model_bayes_thick)
-
-probs_thick <- predict(model_bayes_thick, type = "response")
-actual_thick <- model.frame(model_bayes_thick)$decliners
-roc_bayes_thick <- roc(actual_thick, probs_thick)
-
-print(paste("Cortical Thickness Adjusted AUC:", auc(roc_bayes_thick)))
-coords(roc_bayes_thick, "best", ret=c("threshold", "specificity", "sensitivity"), best.method="youden")
-
-# =========================================================================
-# 5. Hippocampal Activation (Fully Adjusted)
-# =========================================================================
-model_bayes_hip_act <- bayesglm(decliners ~ hipp_mean_act_z + initiale_age + sexe + education + diagnostic_nick, 
-                                data = MRS_prediction, family = binomial(link = "logit"))
-summary(model_bayes_hip_act)
-
-probs_hip_act <- predict(model_bayes_hip_act, type = "response")
-actual_hip_act <- model.frame(model_bayes_hip_act)$decliners
-roc_bayes_hip_act <- roc(actual_hip_act, probs_hip_act)
-
-print(paste("Hippocampal Activation Adjusted AUC:", auc(roc_bayes_hip_act)))
-coords(roc_bayes_hip_act, "best", ret=c("threshold", "specificity", "sensitivity"), best.method="youden")
-
-# =========================================================================
-# 6. Superior Parietal Activation (Fully Adjusted)
-# =========================================================================
-model_bayes_par_act <- bayesglm(decliners ~ activation_parietal_sup_l_z + initiale_age + sexe + education + diagnostic_nick, 
-                                data = MRS_prediction, family = binomial(link = "logit"))
-summary(model_bayes_par_act)
-
-probs_par_act <- predict(model_bayes_par_act, type = "response")
-actual_par_act <- model.frame(model_bayes_par_act)$decliners
-roc_bayes_par_act <- roc(actual_par_act, probs_par_act)
-
-print(paste("Superior Parietal Act Adjusted AUC:", auc(roc_bayes_par_act)))
-coords(roc_bayes_par_act, "best", ret=c("threshold", "specificity", "sensitivity"), best.method="youden")
-
-
-
-# =========================================================================
-# MULTIMODAL MODELS: BIOMARKERS + METABOLISM
-# =========================================================================
-
-# 1. Plasma p-Tau217 + ACC Glutamate
-model_ptau_acc <- bayesglm(decliners ~ plasma_ptau217_z + m_m_acc_z + initiale_age + sexe + education + diagnostic_nick, 
-                           data = MRS_prediction, family = binomial(link = "logit"))
-probs_ptau_acc <- predict(model_ptau_acc, type = "response")
-actual_ptau_acc <- model.frame(model_ptau_acc)$decliners
-roc_ptau_acc <- roc(actual_ptau_acc, probs_ptau_acc)
-print(paste("p-Tau217 + ACC AUC:", auc(roc_ptau_acc)))
-coords(roc_ptau_acc, "best", ret=c("threshold", "specificity", "sensitivity"), best.method="youden")
-
-# 2. Plasma p-Tau217 + Precuneus Glutamate
-model_ptau_prec <- bayesglm(decliners ~ plasma_ptau217_z + m_m_precuneus_z + initiale_age + sexe + education + diagnostic_nick, 
-                            data = MRS_prediction, family = binomial(link = "logit"))
-probs_ptau_prec <- predict(model_ptau_prec, type = "response")
-actual_ptau_prec <- model.frame(model_ptau_prec)$decliners
-roc_ptau_prec <- roc(actual_ptau_prec, probs_ptau_prec)
-print(paste("p-Tau217 + Precuneus AUC:", auc(roc_ptau_prec)))
-coords(roc_ptau_prec, "best", ret=c("threshold", "specificity", "sensitivity"), best.method="youden")
-
-# =========================================================================
-# MULTIMODAL MODELS: STRUCTURE + METABOLISM
-# =========================================================================
-
-# 7. Precuneus Glutamate + AD-Signature Cortical Thickness
-model_prec_thick <- bayesglm(decliners ~ m_m_precuneus_z + cortical_thickness_adsignature_dickson_z + initiale_age + sexe + education + diagnostic_nick, 
-                             data = MRS_prediction, family = binomial(link = "logit"))
-probs_prec_thick <- predict(model_prec_thick, type = "response")
-actual_prec_thick <- model.frame(model_prec_thick)$decliners
-roc_prec_thick <- roc(actual_prec_thick, probs_prec_thick)
-print(paste("Precuneus + Thickness AUC:", auc(roc_prec_thick)))
-coords(roc_prec_thick, "best", ret=c("threshold", "specificity", "sensitivity"), best.method="youden")
-
-# 8. ACC Glutamate + AD-Signature Cortical Thickness
-model_acc_thick <- bayesglm(decliners ~ m_m_acc_z + cortical_thickness_adsignature_dickson_z + initiale_age + sexe + education + diagnostic_nick, 
-                            data = MRS_prediction, family = binomial(link = "logit"))
-probs_acc_thick <- predict(model_acc_thick, type = "response")
-actual_acc_thick <- model.frame(model_acc_thick)$decliners
-roc_acc_thick <- roc(actual_acc_thick, probs_acc_thick)
-print(paste("ACC + Thickness AUC:", auc(roc_acc_thick)))
-coords(roc_acc_thick, "best", ret=c("threshold", "specificity", "sensitivity"), best.method="youden")
-
-# 9. Precuneus Glutamate + Hippocampal Volume
-model_prec_hip_vol <- bayesglm(decliners ~ m_m_precuneus_z + hipp_mean_z + initiale_age + sexe + education + diagnostic_nick, 
-                               data = MRS_prediction, family = binomial(link = "logit"))
-probs_prec_hip_vol <- predict(model_prec_hip_vol, type = "response")
-actual_prec_hip_vol <- model.frame(model_prec_hip_vol)$decliners
-roc_prec_hip_vol <- roc(actual_prec_hip_vol, probs_prec_hip_vol)
-print(paste("Precuneus + Hipp Volume AUC:", auc(roc_prec_hip_vol)))
-coords(roc_prec_hip_vol, "best", ret=c("threshold", "specificity", "sensitivity"), best.method="youden")
-
-# 10. ACC Glutamate + Hippocampal Volume
-model_acc_hip_vol <- bayesglm(decliners ~ m_m_acc_z + hipp_mean_z + initiale_age + sexe + education + diagnostic_nick, 
-                              data = MRS_prediction, family = binomial(link = "logit"))
-probs_acc_hip_vol <- predict(model_acc_hip_vol, type = "response")
-actual_acc_hip_vol <- model.frame(model_acc_hip_vol)$decliners
-roc_acc_hip_vol <- roc(actual_acc_hip_vol, probs_acc_hip_vol)
-print(paste("ACC + Hipp Volume AUC:", auc(roc_acc_hip_vol)))
-coords(roc_acc_hip_vol, "best", ret=c("threshold", "specificity", "sensitivity"), best.method="youden")
-
-# =========================================================================
-# MULTIMODAL MODELS: FUNCTIONAL ACTIVATION + METABOLISM
-# =========================================================================
-
-# 3. Precuneus Glutamate + Superior Parietal Activation
-model_prec_par_act <- bayesglm(decliners ~ m_m_precuneus_z + activation_parietal_sup_l_z + initiale_age + sexe + education + diagnostic_nick, 
-                               data = MRS_prediction, family = binomial(link = "logit"))
-probs_prec_par_act <- predict(model_prec_par_act, type = "response")
-actual_prec_par_act <- model.frame(model_prec_par_act)$decliners
-roc_prec_par_act <- roc(actual_prec_par_act, probs_prec_par_act)
-print(paste("Precuneus + Sup Parietal Act AUC:", auc(roc_prec_par_act)))
-coords(roc_prec_par_act, "best", ret=c("threshold", "specificity", "sensitivity"), best.method="youden")
-
-# 4. ACC Glutamate + Superior Parietal Activation
-model_acc_par_act <- bayesglm(decliners ~ m_m_acc_z + activation_parietal_sup_l_z + initiale_age + sexe + education + diagnostic_nick, 
-                              data = MRS_prediction, family = binomial(link = "logit"))
-probs_acc_par_act <- predict(model_acc_par_act, type = "response")
-actual_acc_par_act <- model.frame(model_acc_par_act)$decliners
-roc_acc_par_act <- roc(actual_acc_par_act, probs_acc_par_act)
-print(paste("ACC + Sup Parietal Act AUC:", auc(roc_acc_par_act)))
-coords(roc_acc_par_act, "best", ret=c("threshold", "specificity", "sensitivity"), best.method="youden")
-
-# 5. Precuneus Glutamate + Hippocampal Activation
-model_prec_hip_act <- bayesglm(decliners ~ m_m_precuneus_z + hipp_mean_act_z + initiale_age + sexe + education + diagnostic_nick, 
-                               data = MRS_prediction, family = binomial(link = "logit"))
-probs_prec_hip_act <- predict(model_prec_hip_act, type = "response")
-actual_prec_hip_act <- model.frame(model_prec_hip_act)$decliners
-roc_prec_hip_act <- roc(actual_prec_hip_act, probs_prec_hip_act)
-print(paste("Precuneus + Hipp Act AUC:", auc(roc_prec_hip_act)))
-coords(roc_prec_hip_act, "best", ret=c("threshold", "specificity", "sensitivity"), best.method="youden")
-
-# 6. ACC Glutamate + Hippocampal Activation
-model_acc_hip_act <- bayesglm(decliners ~ m_m_acc_z + hipp_mean_act_z + initiale_age + sexe + education + diagnostic_nick, 
-                              data = MRS_prediction, family = binomial(link = "logit"))
-probs_acc_hip_act <- predict(model_acc_hip_act, type = "response")
-actual_acc_hip_act <- model.frame(model_acc_hip_act)$decliners
-roc_acc_hip_act <- roc(actual_acc_hip_act, probs_acc_hip_act)
-print(paste("ACC + Hipp Act AUC:", auc(roc_acc_hip_act)))
-coords(roc_acc_hip_act, "best", ret=c("threshold", "specificity", "sensitivity"), best.method="youden")
-
-# =========================================================================
-# MULTIMODAL MODELS: DUAL METABOLISM
-# =========================================================================
-
-# 11. Precuneus Glutamate + ACC Glutamate
-model_prec_acc <- bayesglm(decliners ~ m_m_precuneus_z + m_m_acc_z + initiale_age + sexe + education + diagnostic_nick, 
-                           data = MRS_prediction, family = binomial(link = "logit"))
-probs_prec_acc <- predict(model_prec_acc, type = "response")
-actual_prec_acc <- model.frame(model_prec_acc)$decliners
-roc_prec_acc <- roc(actual_prec_acc, probs_prec_acc)
-print(paste("Precuneus + ACC AUC:", auc(roc_prec_acc)))
-coords(roc_prec_acc, "best", ret=c("threshold", "specificity", "sensitivity"), best.method="youden")
-
-
-
-
-
-library(arm)
-library(pROC)
-
-# This function automates the LOO process for any model formula
-run_loo_cv <- function(formula_str, data) {
-  n <- nrow(data)
-  predictions <- numeric(n)
-  actuals <- data$decliners
+# 1. Define the master LOOCV function
+run_loocv <- function(formula_str, data, model_name) {
+  form <- as.formula(formula_str)
+  vars <- all.vars(form)
   
-  for(i in 1:n) {
-    # Train on N-1
-    train_data <- data[-i, ]
-    test_data <- data[i, ]
+  # Isolate data for this specific model and drop missing observations
+  clean_data <- data[, vars, drop = FALSE]
+  clean_data <- clean_data[complete.cases(clean_data), ]
+  
+  n <- nrow(clean_data)
+  cv_predictions <- numeric(n)
+  
+  # Loop row-by-row (Leave One Out)
+  for (i in 1:n) {
+    train_set <- clean_data[-i, ]
+    test_set  <- clean_data[i, ]
     
-    # Run the model
-    fit <- bayesglm(as.formula(formula_str), data = train_data, family = binomial(link = "logit"))
+    # Train on N-1 subjects
+    fit <- glm(form, data = train_set, family = "binomial")
     
-    # Predict for the 1 left out
-    predictions[i] <- predict(fit, newdata = test_data, type = "response")
+    # Predict on the left-out subject
+    cv_predictions[i] <- predict(fit, newdata = test_set, type = "response")
   }
   
-  roc_loo <- roc(actuals, predictions, quiet = TRUE)
-  return(auc(roc_loo))
+  # Generate true out-of-sample ROC curves
+  actual_outcomes <- clean_data[[vars[1]]]
+  roc_cv <- pROC::roc(actual_outcomes, cv_predictions, quiet = TRUE)
+  
+  # Extract optimal threshold coordinates via Youden Index
+  coords_cv <- pROC::coords(roc_cv, "best", ret = c("threshold", "specificity", "sensitivity"), best.method = "youden")
+  if (!is.null(nrow(coords_cv)) && nrow(coords_cv) > 1) coords_cv <- coords_cv[1, ]
+  
+  # Calculate true out-of-sample classification accuracy
+  predicted_classes <- ifelse(cv_predictions >= coords_cv$threshold, 1, 0)
+  acc_cv <- mean(predicted_classes == actual_outcomes)
+  
+  # Return metrics as a clean data frame row
+  return(data.frame(
+    Model  = model_name,
+    N_Obs  = n,
+    CV_AUC = round(pROC::auc(roc_cv) * 100, 1),
+    CV_ACC = round(acc_cv * 100, 1),
+    CV_SEN = round(coords_cv$sensitivity * 100, 1),
+    CV_SPE = round(coords_cv$specificity * 100, 1)
+  ))
 }
 
-
-
-# Define your covariates
-covars <- " + initiale_age + sexe + education + diagnostic_nick"
-
-# Run for all your variables
-models_to_check <- c(
-  "decliners ~ plasma_ptau217_z",
-  "decliners ~ m_m_precuneus_z",
-  "decliners ~ m_m_acc_z",
-  "decliners ~ hipp_mean_z",
-  "decliners ~ cortical_thickness_adsignature_dickson_z",
-  "decliners ~ hipp_mean_act_z",
-  "decliners ~ activation_parietal_sup_l_z"
+# 2. Map every single one of your models to its exact formula string
+models_to_test <- list(
+  # --- Unimodal Models ---
+  c("decliner_regression ~ plasma_ptau217_z", "Unimodal: Plasma p-Tau217"),
+  c("decliner_regression ~ m_m_precuneus_z", "Unimodal: Precuneus Glutamate"),
+  c("decliner_regression ~ m_m_acc_z", "Unimodal: ACC Glutamate"),
+  c("decliner_regression ~ hipp_mean_z", "Unimodal: Hippocampal Volume"),
+  c("decliner_regression ~ cortical_thickness_adsignature_dickson_z", "Unimodal: Cortical Thickness"),
+  c("decliner_regression ~ hipp_mean_act_z", "Unimodal: Hippocampal Activation"),
+  c("decliner_regression ~ activation_parietal_sup_l_z", "Unimodal: Superior Parietal Activation"),
+  
+  # --- Bivariate Models ---
+  c("decliner_regression ~ plasma_ptau217_z + m_m_acc_z", "Bivariate: p-Tau217 + ACC Glu"),
+  c("decliner_regression ~ plasma_ptau217_z + m_m_precuneus_z", "Bivariate: p-Tau217 + Precuneus Glu"),
+  c("decliner_regression ~ m_m_precuneus_z + cortical_thickness_adsignature_dickson_z", "Bivariate: Precuneus Glu + Cortical Thickness"),
+  c("decliner_regression ~ m_m_acc_z + cortical_thickness_adsignature_dickson_z", "Bivariate: ACC Glu + Cortical Thickness"),
+  c("decliner_regression ~ m_m_precuneus_z + hipp_mean_z", "Bivariate: Precuneus Glu + Hippocampal Volume"),
+  c("decliner_regression ~ m_m_acc_z + hipp_mean_z", "Bivariate: ACC Glu + Hippocampal Volume"),
+  c("decliner_regression ~ m_m_precuneus_z + activation_parietal_sup_l_z", "Bivariate: Precuneus Glu + Parietal Activation"),
+  c("decliner_regression ~ m_m_acc_z + activation_parietal_sup_l_z", "Bivariate: ACC Glu + Parietal Activation"),
+  c("decliner_regression ~ m_m_precuneus_z + hipp_mean_act_z", "Bivariate: Precuneus Glu + Hippocampal Activation"),
+  c("decliner_regression ~ m_m_acc_z + hipp_mean_act_z", "Bivariate: ACC Glu + Hippocampal Activation"),
+  c("decliner_regression ~ m_m_precuneus_z + m_m_acc_z", "Bivariate: Precuneus Glu + ACC Glu")
 )
 
-# Loop through and print results
-for (m in models_to_check) {
-  full_formula <- paste0(m, covars)
-  cv_auc <- run_loo_cv(full_formula, MRS_prediction)
-  cat(paste0("Formula: ", m, "\n   LOO AUC: ", round(cv_auc, 3), "\n\n"))
-}
+# 3. Execute the cross-validation loop over your dataset
+loocv_results_list <- lapply(models_to_test, function(m) {
+  run_loocv(formula_str = m[1], data = MRS_prediction, model_name = m[2])
+})
+
+# 4. Bind into a clear, unified master results matrix
+master_loocv_table <- do.call(rbind, loocv_results_list)
+print(master_loocv_table)
 
 
 
-### Non glu  variables models
-# 1. p-Tau217 + Hippocampal Volume + Hippocampal Activation
-model_ptau_hipvol_hipact <- glm(decliners ~ plasma_ptau217_z + hipp_mean_z + hipp_mean_act_z, data = MRS_prediction, family = "binomial")
-summary(model_ptau_hipvol_hipact)
-roc_ptau_hipvol_hipact <- roc(model_ptau_hipvol_hipact$y, fitted(model_ptau_hipvol_hipact))
-auc(roc_ptau_hipvol_hipact)
-coords(roc_ptau_hipvol_hipact, "best", ret=c("threshold", "specificity", "sensitivity"), best.method="youden")
-
-# 2. p-Tau217 + Hippocampal Volume
-model_ptau_hipvol <- glm(decliners ~ plasma_ptau217_z + hipp_mean_z, data = MRS_prediction, family = "binomial")
-summary(model_ptau_hipvol)
-roc_ptau_hipvol <- roc(model_ptau_hipvol$y, fitted(model_ptau_hipvol))
-auc(roc_ptau_hipvol)
-coords(roc_ptau_hipvol, "best", ret=c("threshold", "specificity", "sensitivity"), best.method="youden")
-
-# 3. Cortical Thickness + Hippocampal Activation
-model_thick_hipact <- glm(decliners ~ cortical_thickness_adsignature_dickson_z + hipp_mean_act_z, data = MRS_prediction, family = "binomial")
-summary(model_thick_hipact)
-roc_thick_hipact <- roc(model_thick_hipact$y, fitted(model_thick_hipact))
-auc(roc_thick_hipact)
-coords(roc_thick_hipact, "best", ret=c("threshold", "specificity", "sensitivity"), best.method="youden")
-
-
-
-
-
-
-### Objerctive 3 #####
+################# # Objerctive 3 #######################
 ## Sruvival analysis #####
 library(survival)
 names(MRS_prediction)
 sapply(MRS_prediction, class)
 
-summary(coxph(Surv(time_to_event, ever_declined) ~ plasma_ptau217_z + initiale_age, data = MRS_prediction))
-summary(coxph(Surv(time_to_event, ever_declined) ~ m_m_acc_z  + initiale_age, data = MRS_prediction))
-summary(coxph(Surv(time_to_event, ever_declined) ~ m_m_precuneus_z + initiale_age, data = MRS_prediction))
-summary(coxph(Surv(time_to_event, ever_declined) ~ hipp_mean + initiale_age, data = MRS_prediction))
-summary(coxph(Surv(time_to_event, ever_declined) ~ cortical_thickness_adsignature_dickson + initiale_age, data = MRS_prediction))
-summary(coxph(Surv(time_to_event, ever_declined) ~ hipp_mean_act + initiale_age, data = MRS_prediction))
-summary(coxph(Surv(time_to_event, ever_declined) ~ activation_parietal_sup_l + initiale_age, data = MRS_prediction))
+summary(coxph(Surv(time_to_event, decliner_regression) ~ plasma_ptau217_z + initiale_age, data = MRS_prediction))
+summary(coxph(Surv(time_to_event, decliner_regression) ~ m_m_acc_z  + initiale_age, data = MRS_prediction))
+summary(coxph(Surv(time_to_event, decliner_regression) ~ m_m_precuneus_z + initiale_age, data = MRS_prediction))
+summary(coxph(Surv(time_to_event, decliner_regression) ~ hipp_mean + initiale_age, data = MRS_prediction))
+summary(coxph(Surv(time_to_event, decliner_regression) ~ cortical_thickness_adsignature_dickson + initiale_age, data = MRS_prediction))
+summary(coxph(Surv(time_to_event, decliner_regression) ~ hipp_mean_act + initiale_age, data = MRS_prediction))
+summary(coxph(Surv(time_to_event, decliner_regression) ~ activation_parietal_sup_l + initiale_age, data = MRS_prediction))
 
 
 
@@ -762,5 +624,34 @@ summary(coxph(Surv(time_to_event, ever_declined) ~ m_m_acc_z + hipp_mean + initi
 
 
 
+# 1. Create the isolated dataset using a completely unique column name
+cox_data <- MRS_prediction_long %>%
+  group_by(pscid) %>%
+  summarize(followup_years = max(years_from_baseline, na.rm = TRUE)) %>%
+  left_join(MRS_prediction, by = "pscid")
+
+# 2. Run the Cox models using 'followup_years'
+summary(coxph(Surv(followup_years, decliner_regression) ~ plasma_ptau217_z + initiale_age, data = cox_data))
+
+summary(coxph(Surv(followup_years, decliner_regression) ~ m_m_acc_z + initiale_age, data = cox_data))
+
+summary(coxph(Surv(followup_years, decliner_regression) ~ m_m_precuneus_z + initiale_age, data = cox_data))
+
+summary(coxph(Surv(followup_years, decliner_regression) ~ hipp_mean_z + initiale_age, data = cox_data))
+
+summary(coxph(Surv(followup_years, decliner_regression) ~ cortical_thickness_adsignature_dickson_z + initiale_age, data = cox_data))
+
+summary(coxph(Surv(followup_years, decliner_regression) ~ hipp_mean_act_z + initiale_age, data = cox_data))
+
+summary(coxph(Surv(followup_years, decliner_regression) ~ activation_parietal_sup_l_z + initiale_age, data = cox_data))
 
 
+
+
+# 1. Overall Time to 50% Decline for the whole cohort
+survfit(Surv(followup_years, decliner_regression) ~ 1, data = cox_data)
+
+# 2. Time to 50% Decline split by your ACC Glutamate groups
+survfit(Surv(followup_years, decliner_regression) ~ acc_strata, data = cox_data)
+
+survfit(Surv(followup_years, decliner_regression) ~ prec_strata, data = cox_data)
