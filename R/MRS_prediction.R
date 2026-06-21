@@ -67,7 +67,9 @@ MRS_prediction$hipp_mean <- winsorize_iqr(MRS_prediction$hipp_mean, 1.5)
 ## fMRI Activation Variables
 MRS_prediction$activation_hippocampus_l <- winsorize_iqr(MRS_prediction$activation_hippocampus_l, 1.5)
 MRS_prediction$hipp_mean_act <- winsorize_iqr(MRS_prediction$hipp_mean_act, 1.5)
+MRS_prediction$arsenii_hippocampus_avg_act <- winsorize_iqr(MRS_prediction$arsenii_hippocampus_avg_act, 1.5)
 MRS_prediction$activation_parietal_sup_l <- winsorize_iqr(MRS_prediction$activation_parietal_sup_l, 1.5)
+MRS_prediction$arsenii_parietal_sup_l_act <- winsorize_iqr(MRS_prediction$arsenii_parietal_sup_l_act, 1.5)
 MRS_prediction$activation_temporal_inf_r <- winsorize_iqr(MRS_prediction$activation_temporal_inf_r, 1.5)
 
 
@@ -92,13 +94,14 @@ MRS_prediction$activation_hippocampus_l_z <- scale(MRS_prediction$activation_hip
 MRS_prediction$hipp_mean_act_z <- scale(MRS_prediction$hipp_mean_act)
 MRS_prediction$activation_parietal_sup_l_z <- scale(MRS_prediction$activation_parietal_sup_l)
 
-MRS_prediction_long$arsenii_hippocampus_avg_act_z <- scale(MRS_prediction_long$arsenii_hippocampus_avg_act)
 
 ## Long format 
 X2026_06_16_MRS_prediction_long <- read_excel("C:/Users/okkam/Desktop/MRS_prediction_longitudinal_master.xlsx")
 MRS_prediction_long <- X2026_06_16_MRS_prediction_long
 lapply(MRS_prediction_long,class)
 
+MRS_prediction_long$arsenii_hippocampus_avg_act <- winsorize_iqr(MRS_prediction_long$arsenii_hippocampus_avg_act, 1.5)
+MRS_prediction_long$arsenii_parietal_sup_l_act <- winsorize_iqr(MRS_prediction_long$arsenii_parietal_sup_l_act, 1.5)
 
 # Extract moca slopes for each participant 
 raw_individual_models <- lmList(moca ~ years_from_baseline | pscid, data = MRS_prediction_long)
@@ -220,6 +223,11 @@ summary(lm(slope_regression_yearly ~ parietal_sup_l_act, data = MRS_prediction))
 
 ## same with LMM
 names(MRS_prediction_long)
+
+mixed_model_moca <- lmer(moca ~ years_from_baseline + sexe + diagnostic_nick + education + initiale_age + (1 | pscid),  
+                         data = MRS_prediction_long)
+summary(mixed_model_moca)
+
 # Mixed-Effects Models
 #   Glutamate 
 mixed_model_precuneus <- lmer(moca ~ years_from_baseline * m_m_precuneus_z + sexe + diagnostic_nick + education + initiale_age + (1 | pscid),  
@@ -285,11 +293,11 @@ anova(mixed_model_hipp_mean)
 names(MRS_prediction_long)
 # Activation 
 # Hipp
-mixed_model_hipp_mean_act <- lmer(moca ~ years_from_baseline * hipp_mean_act_z + + sexe + diagnostic_nick + education + initiale_age + (1 | pscid),  
-  data = MRS_prediction_long)
-summary(mixed_model_hipp_mean_act)
+#mixed_model_hipp_mean_act <- lmer(moca ~ years_from_baseline * arsenii_hippocampus_avg_act + + sexe + diagnostic_nick + education + initiale_age + (1 | pscid),  
+#  data = MRS_prediction_long)
+#summary(mixed_model_hipp_mean_act)
 
-mixed_model_hipp_mean_act <- lmer(moca ~ years_from_baseline * arsenii_hippocampus_avg_act_z  + + sexe + diagnostic_nick + education + initiale_age + (1 | pscid),  
+mixed_model_hipp_mean_act <- lmer(moca ~ years_from_baseline * hipp_mean_act + sexe + diagnostic_nick + education + initiale_age + (1 | pscid),  
                                   data = MRS_prediction_long)
 summary(mixed_model_hipp_mean_act)
 
@@ -298,6 +306,7 @@ hipp_act_slopes <- emtrends(mixed_model_hipp_mean_act, specs = ~ hipp_mean_act_z
                         var = "years_from_baseline", 
                         at = list(hipp_mean_act_z = c(-1, 0, 1)))
 summary(hipp_act_slopes, infer = TRUE)
+
 
 mixed_model_activation_parietal_l <- lmer(moca ~ years_from_baseline * activation_parietal_sup_l_z + + sexe + diagnostic_nick + education +
                                             initiale_age + (1 | pscid),data = MRS_prediction_long)
@@ -308,7 +317,7 @@ summary(mixed_model_activation_parietal_l)
 
 
 # The Multimodal  Model
-mixed_model_multi <- lmer(moca ~ years_from_baseline * (m_m_acc_z + m_m_precuneus_z  + cortical_thickness_adsignature_dickson_z + arsenii_hippocampus_avg_act_z) + 
+mixed_model_multi <- lmer(moca ~ years_from_baseline * (m_m_acc_z + m_m_precuneus_z  + cortical_thickness_adsignature_dickson_z + arsenii_hippocampus_avg_act + plasma_ptau217) + 
     sexe + diagnostic_nick + education + initiale_age + age_difference + (1 | pscid),  
   data = MRS_prediction_long
 )
@@ -338,6 +347,10 @@ auc(roc_ptau217)
 coords(roc_ptau217, "best", ret=c("threshold", "specificity", "sensitivity"), best.method="youden")
 overall_m_sig(model_glu_ptau217)
 
+
+roc_raw_ptau217 <- roc(MRS_prediction$decliner_regression, MRS_prediction$plasma_ptau217)
+coords(roc_raw_ptau217, "best", ret=c("threshold", "specificity", "sensitivity"), best.method="youden")
+
 # Precuneus Glutamate
 model_glu_prec <- glm(decliner_regression ~ m_m_precuneus_z  , data = MRS_prediction, family = "binomial")
 summary(model_glu_prec)
@@ -353,6 +366,11 @@ roc_glu_acc <- roc(model_glu_acc$y, fitted(model_glu_acc))
 auc(roc_glu_acc)
 coords(roc_glu_acc, "best", ret=c("threshold", "specificity", "sensitivity"), best.method="youden")
 overall_m_sig(model_glu_acc)
+
+roc_raw_acc <- roc(MRS_prediction$decliner_regression, MRS_prediction$m_m_acc)
+coords(roc_raw_acc, "best", ret=c("threshold", "specificity", "sensitivity"), best.method="youden")
+
+
 
 # Hippocampal Volume
 model_struc_hip <- glm(decliner_regression ~ hipp_mean_z  , data = MRS_prediction, family = "binomial")
@@ -377,7 +395,6 @@ roc_func_hip <- roc(model_func_hip$y, fitted(model_func_hip))
 auc(roc_func_hip)
 coords(roc_func_hip, "best", ret=c("threshold", "specificity", "sensitivity"), best.method="youden")
 overall_m_sig(model_func_hip)
-
 
 
 # Superior Parietal Activation

@@ -312,6 +312,59 @@ ggplot(plot_data, aes(x = Clinical_Status, y = .data[[raw_mm_column]], fill = Cl
 
 
 
+# 1. Define the exact column name as a string
+raw_tau_column <- "plasma_ptau217"
+
+# =========================================================================
+# GRAPH 1: Logistic Regression Probability Curve (p-Tau217 version)
+# =========================================================================
+ggplot(plot_data, aes(x = .data[[raw_tau_column]], y = decliner_regression)) +
+  geom_point(aes(color = Clinical_Status), 
+             position = position_jitter(height = 0.03, width = 0), 
+             size = 2.5, alpha = 0.7) +
+  stat_smooth(method = "glm", method.args = list(family = "binomial"), 
+              se = TRUE, color = "#2C3E50", fill = "gray80", alpha = 0.4) +
+  scale_color_manual(values = c("Stable" = "#56B4E9", "Decliner" = "#FDB863")) +
+  labs(
+    title = "Predicted Probability of Cognitive Decline by Plasma p-Tau217",
+    subtitle = "Positive relationship: Systemic pathology trends with progressive risk",
+    x = "Baseline Plasma p-Tau217 Concentration (pg/mL)",
+    y = "Predicted Probability of Longitudinal Regression",
+    color = "Clinical Outcome"
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(
+    legend.position = "top",
+    plot.title = element_text(face = "bold", hjust = 0.5),
+    plot.subtitle = element_text(size = 11, color = "gray40", hjust = 0.5),
+    plot.margin = margin(t = 10, r = 10, b = 10, l = 20, unit = "pt")
+  )
+
+# =========================================================================
+# GRAPH 2: Clinical Separation Boxplot (p-Tau217 version)
+# =========================================================================
+ggplot(plot_data, aes(x = Clinical_Status, y = .data[[raw_tau_column]], fill = Clinical_Status)) +
+  geom_boxplot(alpha = 0.3, outlier.shape = NA, width = 0.4, color = "gray30") +
+  geom_jitter(aes(color = Clinical_Status), width = 0.15, size = 2.5, alpha = 0.8) +
+  scale_fill_manual(values = c("Stable" = "#56B4E9", "Decliner" = "#FDB863")) +
+  scale_color_manual(values = c("Stable" = "#56B4E9", "Decliner" = "#FDB863")) +
+  labs(
+    title = "Baseline Plasma p-Tau217 Separation Profiles",
+    subtitle = "High Specificity (92.9%): Elevated systemic pathology strictly rules in decline",
+    x = "Longitudinal Clinical Outcome (8-Year Window)",
+    y = "Baseline Plasma p-Tau217 Concentration (pg/mL)"
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(
+    legend.position = "none",
+    plot.title = element_text(face = "bold", hjust = 0.5),
+    plot.subtitle = element_text(size = 11, color = "gray40", hjust = 0.5)
+  )
+
+
+
+
+
 
 
 
@@ -354,11 +407,6 @@ ggsurvplot(
   legend = "top",
   ggtheme = theme_minimal() 
 )
-
-
-
-
-
 
 
 
