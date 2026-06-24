@@ -11,6 +11,44 @@ library(emmeans)
 library(ggplot2)
 library(dplyr)
 
+
+
+library(ggplot2)
+
+# 1. Convert the binary 0/1 decliner variable into a clean factor for the legend
+MRS_prediction$decliner_factor <- factor(MRS_prediction$decliner_regression, 
+                                         levels = c(0, 1), 
+                                         labels = c("Stable", "Declined"))
+
+# 2. Build the plot
+ggplot(MRS_prediction, aes(x = m_m_precuneus, y = initiale_moca_score_total_30)) +
+  
+  # Map color to diagnosis (MCI/SCD+) and shape to longitudinal outcome
+  geom_point(aes(color = diagnostic_nick, shape = decliner_factor), 
+             alpha = 0.8, size = 3) +
+  
+  # The overarching quadratic biological curve (kept black to anchor the colored points)
+  stat_smooth(method = "lm", formula = y ~ x + I(x^2), 
+              color = "black", fill = "gray80", linewidth = 1.2) +
+  
+  theme_minimal(base_size = 14) +
+  
+  # Custom poster-ready colors (colorblind-friendly) and shapes (16=circle, 17=triangle)
+  scale_color_manual(values = c("MCI" = "#E69F00", "SCD+" = "#56B4E9")) +
+  scale_shape_manual(values = c("Stable" = 16, "Declined" = 17)) + 
+  
+  labs(
+    title = "Baseline Precuneus Glutamate vs. Initial MoCA",
+    subtitle = "",
+    x = "Precuneus Glutamate ",
+    y = "Initial MoCA Score ",
+    color = "Baseline Diagnosis",
+    shape = "Longitudinal Outcome"
+  ) +
+  
+  coord_cartesian(ylim = c(15, 30))
+
+
 # ==============================================================================
 # 1. MODIFIED MASTER VISUALIZATION ENGINE (With Ribbons & 24-30 scale)
 # ==============================================================================

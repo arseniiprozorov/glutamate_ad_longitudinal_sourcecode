@@ -213,6 +213,11 @@ names(MRS_prediction)
 
 summary(lm(slope_regression_yearly ~ m_m_precuneus , data = MRS_prediction))
 summary(lm(slope_regression_yearly ~ m_m_acc, data = MRS_prediction))
+summary(lm(slope_regression_yearly ~ m_m_precuneus + I(m_m_precuneus^2) , data = MRS_prediction))
+summary(lm(slope_regression_yearly ~ m_m_acc + I(m_m_precuneus^2), data = MRS_prediction))
+summary(lm(initiale_moca_score_total_30 ~ m_m_precuneus + I(m_m_precuneus^2) , data = MRS_prediction))
+summary(lm(initiale_moca_score_total_30 ~ m_m_acc + I(m_m_acc^2) , data = MRS_prediction))
+
 
 summary(lm(slope_regression_yearly ~ plasma_ptau217, data = MRS_prediction))
 summary(lm(slope_regression_yearly ~ cortical_thickness_adsignature_dickson, data = MRS_prediction))
@@ -223,7 +228,7 @@ summary(lm(slope_regression_yearly ~ parietal_sup_l_act, data = MRS_prediction))
 
 ## same with LMM
 names(MRS_prediction_long)
-
+levels(MRS_prediction_long$diagnostic_nick)
 mixed_model_moca <- lmer(moca ~ years_from_baseline + sexe + diagnostic_nick + education + initiale_age + (1 | pscid),  
                          data = MRS_prediction_long)
 summary(mixed_model_moca)
@@ -236,9 +241,9 @@ summary(mixed_model_precuneus)
 
 precuneus_slopes <- emtrends(mixed_model_precuneus, specs = ~ m_m_precuneus_z, 
                             var = "years_from_baseline", 
-                            at = list(m_m_precuneus_z = c(-1, 0, 1)))
+                            at = list(m_m_precuneus_z = c(-1,0,1)))
 summary(precuneus_slopes, infer = TRUE)
-anova(mixed_model_precuneus)
+
 
 
 
@@ -248,7 +253,7 @@ summary(mixed_model_acc)
 
 acc_slopes <- emtrends(mixed_model_acc, specs = ~ m_m_acc_z, 
                              var = "years_from_baseline", 
-                             at = list(m_m_acc_z = c(-1, 0, 1)))
+                             at = list(m_m_acc_z = c(-1,0,1)))
 summary(acc_slopes, infer = TRUE)
 anova(mixed_model_acc)
 
@@ -352,7 +357,7 @@ roc_raw_ptau217 <- roc(MRS_prediction$decliner_regression, MRS_prediction$plasma
 coords(roc_raw_ptau217, "best", ret=c("threshold", "specificity", "sensitivity"), best.method="youden")
 
 # Precuneus Glutamate
-model_glu_prec <- glm(decliner_regression ~ m_m_precuneus_z  , data = MRS_prediction, family = "binomial")
+model_glu_prec <- glm(decliner_regression ~ m_m_precuneus_z , data = MRS_prediction, family = "binomial")
 summary(model_glu_prec)
 roc_glu_prec <- roc(model_glu_prec$y, fitted(model_glu_prec))
 auc(roc_glu_prec)
@@ -672,3 +677,12 @@ survfit(Surv(followup_years, decliner_regression) ~ 1, data = cox_data)
 survfit(Surv(followup_years, decliner_regression) ~ acc_strata, data = cox_data)
 
 survfit(Surv(followup_years, decliner_regression) ~ prec_strata, data = cox_data)
+
+
+
+
+
+
+
+
+
