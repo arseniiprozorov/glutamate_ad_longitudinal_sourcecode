@@ -636,26 +636,26 @@ names(MRS_prediction_long)
 #Surv(time, status): Defines the survival time and the event indicator (e.g., 1 for event, 0 for censored).
 #exp(coef): Represents the Hazard Ratio.If HR = 1, the risk is equal between groups.If HR = 1.5, the event rate is 50% higher at any given moment.
 
-surv_acc <- coxph(Surv(time_to_event, ever_declined) ~ m_m_acc_z  + initiale_age, data = MRS_prediction)
+surv_acc <- coxph(Surv(max_years_from_baseline, decliner_regression) ~ m_m_acc_z  + initiale_age, data = MRS_prediction)
 summary(surv_acc)
 exp(confint(surv_acc))
-surv_prec <- coxph(Surv(time_to_event, ever_declined) ~ m_m_precuneus_z + initiale_age, data = MRS_prediction)
+surv_prec <- coxph(Surv(max_years_from_baseline, decliner_regression) ~ m_m_precuneus_z + initiale_age, data = MRS_prediction)
 summary(surv_prec)
 exp(confint(surv_prec))
 
-summary(coxph(Surv(time_to_event, ever_declined) ~ plasma_ptau217_z + initiale_age, data = MRS_prediction))
-summary(coxph(Surv(time_to_event, ever_declined) ~ hipp_mean + initiale_age, data = MRS_prediction))
-summary(coxph(Surv(time_to_event, ever_declined) ~ cortical_thickness_adsignature_dickson + initiale_age, data = MRS_prediction))
-summary(coxph(Surv(time_to_event, ever_declined) ~ hipp_mean_act + initiale_age, data = MRS_prediction))
-summary(coxph(Surv(time_to_event, ever_declined) ~ activation_parietal_sup_l + initiale_age, data = MRS_prediction))
+summary(coxph(Surv(time_to_event, decliner_regression) ~ plasma_ptau217_z + initiale_age, data = MRS_prediction))
+summary(coxph(Surv(time_to_event, decliner_regression) ~ hipp_mean + initiale_age, data = MRS_prediction))
+summary(coxph(Surv(time_to_event, decliner_regression) ~ cortical_thickness_adsignature_dickson + initiale_age, data = MRS_prediction))
+summary(coxph(Surv(time_to_event, decliner_regression) ~ hipp_mean_act + initiale_age, data = MRS_prediction))
+summary(coxph(Surv(time_to_event, decliner_regression) ~ activation_parietal_sup_l + initiale_age, data = MRS_prediction))
 
 
 # Bivariate models
-summary(coxph(Surv(time_to_event, ever_declined) ~ m_m_acc_z + plasma_ptau217_z + initiale_age, data = MRS_prediction))
-summary(coxph(Surv(time_to_event, ever_declined) ~ m_m_acc_z + activation_parietal_sup_l + initiale_age, data = MRS_prediction))
-summary(coxph(Surv(time_to_event, ever_declined) ~ m_m_acc_z + hipp_mean_act_z + initiale_age, data = MRS_prediction))
-summary(coxph(Surv(time_to_event, ever_declined) ~ m_m_acc_z + cortical_thickness_adsignature_dickson + initiale_age, data = MRS_prediction))
-summary(coxph(Surv(time_to_event, ever_declined) ~ m_m_acc_z + hipp_mean + initiale_age, data = MRS_prediction))
+summary(coxph(Surv(time_to_event, decliner_regression) ~ m_m_acc_z + plasma_ptau217_z + initiale_age, data = MRS_prediction))
+summary(coxph(Surv(time_to_event, decliner_regression) ~ m_m_acc_z + activation_parietal_sup_l + initiale_age, data = MRS_prediction))
+summary(coxph(Surv(time_to_event, decliner_regression) ~ m_m_acc_z + hipp_mean_act_z + initiale_age, data = MRS_prediction))
+summary(coxph(Surv(time_to_event, decliner_regression) ~ m_m_acc_z + cortical_thickness_adsignature_dickson + initiale_age, data = MRS_prediction))
+summary(coxph(Surv(time_to_event, decliner_regression) ~ m_m_acc_z + hipp_mean + initiale_age, data = MRS_prediction))
 
 
 
@@ -678,17 +678,20 @@ MRS_prediction$precuneus_tertiales <- cut(MRS_prediction$m_m_precuneus_z,
 
 
 # 2. Time to 50% Decline split by your ACC Glutamate groups
-survfit(Surv(time_to_event, ever_declined) ~ acc_tertiales, data = MRS_prediction)
+survfit(Surv(max_years_from_baseline, decliner_regression) ~ acc_tertiales, data = MRS_prediction)
 
-survfit(Surv(time_to_event, ever_declined) ~ precuneus_tertiales, data = MRS_prediction)
-
-
+survfit(Surv(max_years_from_baseline, decliner_regression) ~ precuneus_tertiales, data = MRS_prediction)
 
 
 
 
-
-
-
+# Estimate the survival curve for a specific patient profile
+# (e.g., the average patient profile in your data)
+surv_curve <- survfit(surv_acc, newdata = MRS_prediction) 
+summary(surv_curve)
+surv_curve
+# Calculate the expected duration (Mean time to event)
+mean_time <- coxed(cox_model, newdata = my_data)
+mean_time$expected.duration
 
 
