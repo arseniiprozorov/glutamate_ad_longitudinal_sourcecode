@@ -8,6 +8,7 @@ library(lme4)
 library(lmerTest) 
 library(pROC)
 library(openxlsx)
+library(survival)
 
 ## Predicting cognitive change using metabolic, tau, functional and structural predictors  ######
 ## Arsenii Prozorov 
@@ -15,6 +16,7 @@ library(openxlsx)
 #Création d’une banque de données
 X2026_06_15_dataset_prediction <- read_excel("C:/Users/okkam/Desktop/labo/article 2/Longitudinal_Multimodal_Data_CIMAQ/article_prediction/2026-06-15_dataset_prediction.xlsx")
 MRS_prediction <- X2026_06_15_dataset_prediction
+
 
 
 # Clean the column name
@@ -622,22 +624,33 @@ print(master_loocv_table)
 
 ################# # Objerctive 3 #######################
 ## Sruvival analysis #####
-library(survival)
 names(MRS_prediction)
-sapply(MRS_prediction, class)
+names(MRS_prediction_long)
 
-summary(coxph(Surv(time_to_event, decliner_regression) ~ plasma_ptau217_z + initiale_age, data = MRS_prediction))
-summary(coxph(Surv(time_to_event, decliner_regression) ~ m_m_acc_z  + initiale_age, data = MRS_prediction))
-summary(coxph(Surv(time_to_event, decliner_regression) ~ m_m_precuneus_z + initiale_age, data = MRS_prediction))
-summary(coxph(Surv(time_to_event, decliner_regression) ~ hipp_mean + initiale_age, data = MRS_prediction))
-summary(coxph(Surv(time_to_event, decliner_regression) ~ cortical_thickness_adsignature_dickson + initiale_age, data = MRS_prediction))
-summary(coxph(Surv(time_to_event, decliner_regression) ~ hipp_mean_act + initiale_age, data = MRS_prediction))
-summary(coxph(Surv(time_to_event, decliner_regression) ~ activation_parietal_sup_l + initiale_age, data = MRS_prediction))
+# Syntax #
+# Fit the Cox Proportional Hazards model
+#cox_model <- coxph(Surv(time, status) ~ treatment, data = my_data)
+# Extract Hazard Ratios (exp(coef)) and 95% Confidence Intervals
+#summary(cox_model)
+#exp(confint(cox_model))
+#Surv(time, status): Defines the survival time and the event indicator (e.g., 1 for event, 0 for censored).
+#exp(coef): Represents the Hazard Ratio.If HR = 1, the risk is equal between groups.If HR = 1.5, the event rate is 50% higher at any given moment.
+
+surv_acc <- coxph(Surv(time_to_event, ever_declined) ~ m_m_acc_z  + initiale_age, data = MRS_prediction)
+summary(surv_acc)
+exp(confint(surv_acc))
+surv_prec <- coxph(Surv(time_to_event, ever_declined) ~ m_m_precuneus_z + initiale_age, data = MRS_prediction)
+summary(surv_prec)
+exp(confint(surv_prec))
+
+summary(coxph(Surv(time_to_event, ever_declined) ~ plasma_ptau217_z + initiale_age, data = MRS_prediction))
+summary(coxph(Surv(time_to_event, ever_declined) ~ hipp_mean + initiale_age, data = MRS_prediction))
+summary(coxph(Surv(time_to_event, ever_declined) ~ cortical_thickness_adsignature_dickson + initiale_age, data = MRS_prediction))
+summary(coxph(Surv(time_to_event, ever_declined) ~ hipp_mean_act + initiale_age, data = MRS_prediction))
+summary(coxph(Surv(time_to_event, ever_declined) ~ activation_parietal_sup_l + initiale_age, data = MRS_prediction))
 
 
-
-
-
+# Bivariate models
 summary(coxph(Surv(time_to_event, ever_declined) ~ m_m_acc_z + plasma_ptau217_z + initiale_age, data = MRS_prediction))
 summary(coxph(Surv(time_to_event, ever_declined) ~ m_m_acc_z + activation_parietal_sup_l + initiale_age, data = MRS_prediction))
 summary(coxph(Surv(time_to_event, ever_declined) ~ m_m_acc_z + hipp_mean_act_z + initiale_age, data = MRS_prediction))
@@ -646,37 +659,30 @@ summary(coxph(Surv(time_to_event, ever_declined) ~ m_m_acc_z + hipp_mean + initi
 
 
 
-# 1. Create the isolated dataset using a completely unique column name
-cox_data <- MRS_prediction_long %>%
-  group_by(pscid) %>%
-  summarize(followup_years = max(years_from_baseline, na.rm = TRUE)) %>%
-  left_join(MRS_prediction, by = "pscid")
+# 1. split into tertiales 
+acc_terials <- quantile(MRS_prediction$m_m_acc_z, probs = c(0, 1/3, 2/3, 1), na.rm = TRUE)
+precuneus_terials <- quantile(MRS_prediction$m_m_precuneus_z, probs = c(0, 1/3, 2/3, 1), na.rm = TRUE)
 
-# 2. Run the Cox models using 'followup_years'
-summary(coxph(Surv(followup_years, decliner_regression) ~ plasma_ptau217_z + initiale_age, data = cox_data))
+#  acc
+MRS_prediction$acc_tertiales <- cut(MRS_prediction$m_m_acc_z, 
+                                 breaks = acc_terials, 
+                                 labels = c("Low ACC Glu", "Medium ACC Glu", "High ACC Glu"), 
+                                 include.lowest = TRUE)
 
-summary(coxph(Surv(followup_years, decliner_regression) ~ m_m_acc_z + initiale_age, data = cox_data))
-
-summary(coxph(Surv(followup_years, decliner_regression) ~ m_m_precuneus_z + initiale_age, data = cox_data))
-
-summary(coxph(Surv(followup_years, decliner_regression) ~ hipp_mean_z + initiale_age, data = cox_data))
-
-summary(coxph(Surv(followup_years, decliner_regression) ~ cortical_thickness_adsignature_dickson_z + initiale_age, data = cox_data))
-
-summary(coxph(Surv(followup_years, decliner_regression) ~ hipp_mean_act_z + initiale_age, data = cox_data))
-
-summary(coxph(Surv(followup_years, decliner_regression) ~ activation_parietal_sup_l_z + initiale_age, data = cox_data))
+#  precuneus
+MRS_prediction$precuneus_tertiales <- cut(MRS_prediction$m_m_precuneus_z, 
+                                    breaks = precuneus_terials, 
+                                    labels = c("Low Precuneus Glu", "Medium Precuneus Glu", "High Precuneus Glu"), 
+                                    include.lowest = TRUE)
 
 
-
-
-# 1. Overall Time to 50% Decline for the whole cohort
-survfit(Surv(followup_years, decliner_regression) ~ 1, data = cox_data)
 
 # 2. Time to 50% Decline split by your ACC Glutamate groups
-survfit(Surv(followup_years, decliner_regression) ~ acc_strata, data = cox_data)
+survfit(Surv(time_to_event, ever_declined) ~ acc_tertiales, data = MRS_prediction)
 
-survfit(Surv(followup_years, decliner_regression) ~ prec_strata, data = cox_data)
+survfit(Surv(time_to_event, ever_declined) ~ precuneus_tertiales, data = MRS_prediction)
+
+
 
 
 

@@ -49,6 +49,48 @@ ggplot(MRS_prediction, aes(x = m_m_precuneus, y = initiale_moca_score_total_30))
   coord_cartesian(ylim = c(15, 30))
 
 
+
+
+# 1. Convert the binary 0/1 decliner variable into a clean factor for the legend
+MRS_prediction$decliner_factor <- factor(MRS_prediction$decliner_regression, 
+                                         levels = c(0, 1), 
+                                         labels = c("Stable", "Declined"))
+
+# 2. Build the plot
+ggplot(MRS_prediction, aes(x = m_m_precuneus, y = initiale_moca_score_total_30)) +
+  
+  # The overarching global quadratic curve (kept as a baseline reference)
+  stat_smooth(method = "lm", formula = y ~ x + I(x^2), 
+              color = "black", fill = "gray80", linewidth = 1.2, alpha = 0.5) +
+  
+  # NEW: Subgroup LINEAR curves mapping color to diagnosis and line style to decline
+  # Changed formula to y ~ x to force straight, stable trendlines
+  stat_smooth(aes(color = diagnostic_nick, linetype = decliner_factor),
+              method = "lm", formula = y ~ x, 
+              se = FALSE, linewidth = 1) +
+  
+  # Map color to diagnosis and shape to longitudinal outcome
+  geom_point(aes(color = diagnostic_nick, shape = decliner_factor), 
+             alpha = 0.8, size = 3) +
+  
+  theme_minimal(base_size = 14) +
+  
+  # FIXED: Added the third group ("HC") to explicitly color and label them
+  scale_color_manual(values = c("MCI" = "#E69F00", "SCD+" = "#56B4E9", "HC" = "gray50")) +
+  scale_shape_manual(values = c("Stable" = 16, "Declined" = 17)) + 
+  
+  labs(
+    title = "Baseline Precuneus Glutamate vs. Initial MoCA",
+    subtitle = "Subgroup Linear Trends vs. Global Quadratic Trend",
+    x = "Precuneus Glutamate ",
+    y = "Initial MoCA Score ",
+    color = "Baseline Diagnosis",
+    shape = "Outcome",
+    linetype = "Outcome"
+  ) +
+  
+  coord_cartesian(ylim = c(15, 30))
+
 # ==============================================================================
 # 1. MODIFIED MASTER VISUALIZATION ENGINE (With Ribbons & 24-30 scale)
 # ==============================================================================
@@ -405,33 +447,31 @@ ggplot(plot_data, aes(x = Clinical_Status, y = .data[[raw_tau_column]], fill = C
 
 
 
+############################### Survival plots #######################
+
 
 library(survival)
 library(survminer)
-library(dplyr)
-library(survival)
-library(survminer)
-library(dplyr)
 
-# 1. Categorize continuous ACC glutamate into tertiles inside your cox_data
-cox_data <- cox_data %>%
-  mutate(
-    acc_tertile = ntile(m_m_acc_z, 3),
-    acc_strata = case_when(
-      acc_tertile == 1 ~ "Low ACC Glu",
-      acc_tertile == 2 ~ "Medium ACC Glu",
-      acc_tertile == 3 ~ "High ACC Glu"
-    ),
-    acc_strata = factor(acc_strata, levels = c("Low ACC Glu", "Medium ACC Glu", "High ACC Glu"))
-  )
+# 1. Lock in the factor levels so Low is plotted first and High is plotted last
+MRS_prediction$acc_tertiales <- factor(MRS_prediction$acc_tertiales, 
+                                       levels = c("Low ACC Glu", "Medium ACC Glu", "High ACC Glu"))
 
-# 2. Fit the survival curve matching your Cox model variables
-fit_acc <- survfit(Surv(followup_years, decliner_regression) ~ acc_strata, data = cox_data)
+MRS_prediction$precuneus_tertiales <- factor(MRS_prediction$precuneus_tertiales, 
+                                             levels = c("Low Precuneus Glu", "Medium Precuneus Glu", "High Precuneus Glu"))
 
-# 3. Plot the ACC graph
+
+# ==============================================================================
+# ACC SURVIVAL PLOT
+# ==============================================================================
+
+# Fit the survival curve using the calculated tertiles
+fit_acc <- survfit(Surv(max_years_from_baseline, decliner_regression) ~ acc_tertiales, data = MRS_prediction)
+
+# Plot the ACC graph
 ggsurvplot(
   fit_acc,
-  data = cox_data,
+  data = MRS_prediction,
   conf.int = TRUE,          
   conf.int.alpha = 0.15,      # Slightly lower alpha prevents overlapping cloud confusion
   censor = TRUE,            
@@ -447,33 +487,17 @@ ggsurvplot(
 )
 
 
+# ==============================================================================
+# PRECUNEUS SURVIVAL PLOT
+# ==============================================================================
 
+# Fit the survival curve using the calculated tertiles
+fit_prec <- survfit(Surv(max_years_from_baseline, decliner_regression) ~ precuneus_tertiales, data = MRS_prediction)
 
-
-
-
-
-
-
-# 1. Categorize continuous Precuneus glutamate into tertiles inside your cox_data
-cox_data <- cox_data %>%
-  mutate(
-    prec_tertile = ntile(m_m_precuneus_z, 3),
-    prec_strata = case_when(
-      prec_tertile == 1 ~ "Low Precuneus Glu",
-      prec_tertile == 2 ~ "Medium Precuneus Glu",
-      prec_tertile == 3 ~ "High Precuneus Glu"
-    ),
-    prec_strata = factor(prec_strata, levels = c("Low Precuneus Glu", "Medium Precuneus Glu", "High Precuneus Glu"))
-  )
-
-# 2. Fit the survival curve matching your Cox model variables
-fit_prec <- survfit(Surv(followup_years, decliner_regression) ~ prec_strata, data = cox_data)
-
-# 3. Plot the Precuneus graph
+# Plot the Precuneus graph
 ggsurvplot(
   fit_prec,
-  data = cox_data,
+  data = MRS_prediction,
   conf.int = TRUE,          
   conf.int.alpha = 0.15,     
   censor = TRUE,            
