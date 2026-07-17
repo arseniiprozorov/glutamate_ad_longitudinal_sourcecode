@@ -174,9 +174,41 @@ print(plot_hipp_act)
 print(plot_parietal_act)
 
 
+formula(mixed_model_hipp_mean_act)
+PATH_FIG.precuneus = "Slopes_precuneus.tiff"
+if(file.exists(PATH_FIG.precuneus)){file.remove(PATH_FIG.precuneus)}
 
+##########
+graphics.off()
 
+plot_precuneus <- interactions::interact_plot(
+  mixed_model_precuneus,               # <--- Your lmer model
+  pred        = years_from_baseline,   # <--- Time on the X-axis
+  modx        = m_m_precuneus_z,       # <--- Glutamate creates the different lines
+  modx.values = c(-1, 0, 1),           
+  modx.labels = c("Low Glu (-1 SD)", "Average Glu (0 SD)", "High Glu (+1 SD)"),
+  legend.main = "Precuneus Glutamate",
+  plot.points = TRUE,                  # Plots the raw longitudinal data points
+  
+  # Engine Visual Style
+  interval    = TRUE,                
+  int.alpha   = 0.15,                
+  line.thickness = 2,                
+  point.alpha = 0.3,                 
+  colors      = c("#D55E00", "#737373", "#3B5998") 
+)
 
+plot_precuneus <- plot_precuneus + 
+  theme_minimal(base_size = 12) +
+  labs(
+    x = "Years from Baseline", 
+    y = "MoCA Total Score"
+  ) +
+  theme(panel.grid.minor = element_blank(), legend.position = "right")
+
+############
+ggsave(PATH_FIG.precuneus, plot = plot_precuneus, width = 13, height = 7, units = "cm", dpi=300)
+print(plot_precuneus)
 
 
 

@@ -98,7 +98,7 @@ MRS_prediction$activation_parietal_sup_l_z <- scale(MRS_prediction$activation_pa
 
 
 ## Long format 
-X2026_06_16_MRS_prediction_long <- read_excel("C:/Users/okkam/Desktop/MRS_prediction_longitudinal_master.xlsx")
+X2026_06_16_MRS_prediction_long <- read_excel("C:/Users/okkam/Desktop/labo/article 2/Longitudinal_Multimodal_Data_CIMAQ/article_prediction/2026-06-16_MRS_prediction_long.xlsx")
 MRS_prediction_long <- X2026_06_16_MRS_prediction_long
 lapply(MRS_prediction_long,class)
 
@@ -114,7 +114,8 @@ raw_slopes$moca_change_3_5_yrs <- raw_slopes$years_from_baseline * 3.5
 
 ######################################### Analyses #######################################
 names(MRS_prediction)
-
+library(lme4)
+library(emmeans)
 
 ######### Characterization ###############
 #sink("demographic.txt")
@@ -209,7 +210,7 @@ summary(aov(activation_parietal_sup_l ~ diagnostic_nick, data = MRS_prediction))
 names(MRS_prediction_long)
 names(MRS_prediction)
 
-
+help(emtrends)
 #sink("objective_1_outputs.txt")
 # Moca slope as continous
 
@@ -217,8 +218,14 @@ summary(lm(slope_regression_yearly ~ m_m_precuneus , data = MRS_prediction))
 summary(lm(slope_regression_yearly ~ m_m_acc, data = MRS_prediction))
 summary(lm(slope_regression_yearly ~ m_m_precuneus + I(m_m_precuneus^2) , data = MRS_prediction))
 summary(lm(slope_regression_yearly ~ m_m_acc + I(m_m_precuneus^2), data = MRS_prediction))
-summary(lm(initiale_moca_score_total_30 ~ m_m_precuneus + I(m_m_precuneus^2) , data = MRS_prediction))
+moca_precuneus_quadratic <- lm(initiale_moca_score_total_30 ~ m_m_precuneus + I(m_m_precuneus^2) , data = MRS_prediction)
+AIC(moca_precuneus_quadratic)
+moca_precuneus_linear <- lm(initiale_moca_score_total_30 ~ m_m_precuneus, data = MRS_prediction)
+AIC(moca_precuneus_linear)
+aic_dff <- AIC(moca_precuneus_quadratic) - AIC(moca_precuneus_linear)
+aic_dff
 summary(lm(initiale_moca_score_total_30 ~ m_m_acc + I(m_m_acc^2) , data = MRS_prediction))
+summary(lm(initiale_moca_score_total_30 ~ m_m_acc , data = MRS_prediction))
 
 
 summary(lm(slope_regression_yearly ~ plasma_ptau217, data = MRS_prediction))
@@ -237,7 +244,7 @@ summary(mixed_model_moca)
 
 # Mixed-Effects Models
 #   Glutamate 
-mixed_model_precuneus <- lmer(moca ~ years_from_baseline * m_m_precuneus_z + sexe + diagnostic_nick + education + initiale_age + (1 | pscid),  
+mixed_model_precuneus <- lmer(moca ~ years_from_baseline * m_m_precuneus_z + sexe + diagnostic_nick + education + (1 | pscid),  
   data = MRS_prediction_long)
 summary(mixed_model_precuneus)
 
@@ -246,7 +253,21 @@ precuneus_slopes <- emtrends(mixed_model_precuneus, specs = ~ m_m_precuneus_z,
                             at = list(m_m_precuneus_z = c(-1,0,1)))
 summary(precuneus_slopes, infer = TRUE)
 
+#### With tertials ####
+mixed_model_precuneus_tert <- lmer(moca ~ years_from_baseline * precuneus_tert + sexe + diagnostic_nick + education + (1 | pscid),  
+                                   data = MRS_prediction_long)
+summary(mixed_model_precuneus_tert)
 
+precuneus_tert_slopes <- emtrends(mixed_model_precuneus_tert, 
+                                  specs = ~ precuneus_tert, 
+                                  var = "years_from_baseline")
+
+# THIS is the command that tells you if just one group declines:
+summary(precuneus_tert_slopes, infer = TRUE)
+
+
+
+#### ACC ##########
 
 
 mixed_model_acc <- lmer(moca ~ years_from_baseline * m_m_acc_z + sexe + diagnostic_nick + education + initiale_age + (1 | pscid),  
@@ -258,6 +279,19 @@ acc_slopes <- emtrends(mixed_model_acc, specs = ~ m_m_acc_z,
                              at = list(m_m_acc_z = c(-1,0,1)))
 summary(acc_slopes, infer = TRUE)
 anova(mixed_model_acc)
+
+
+#### With tertials ####
+mixed_model_acc_tert <- lmer(moca ~ years_from_baseline * acc_tert + sexe + diagnostic_nick + education + (1 | pscid),  
+                                   data = MRS_prediction_long)
+summary(mixed_model_acc_tert)
+
+acc_tert_slopes <- emtrends(mixed_model_acc_tert, 
+                                  specs = ~ acc_tert, 
+                                  var = "years_from_baseline")
+
+# THIS is the command that tells you if just one group declines:
+summary(acc_tert_slopes, infer = TRUE)
 
 
 #   pTau217 
@@ -290,7 +324,7 @@ summary(mixed_model_hipp_mean)
 
 hipp_vol_slopes <- emtrends(mixed_model_hipp_mean, specs = ~ hipp_mean_z, 
                          var = "years_from_baseline", 
-                         at = list(hipp_mean_z = c(-1, 0, 1)))
+                         at = list(hipp_mean_z = c(-1, 1)))
 summary(hipp_vol_slopes, infer = TRUE)
 anova(mixed_model_hipp_mean)
 
@@ -329,6 +363,122 @@ mixed_model_multi <- lmer(moca ~ years_from_baseline * (m_m_acc_z + m_m_precuneu
   data = MRS_prediction_long
 )
 summary(mixed_model_multi)
+
+
+
+#### Run with tertials  and quartiles #####
+
+library(dplyr)
+
+# 1. Isolate unique subjects to calculate quantiles safely
+subject_groups <- MRS_prediction_long %>%
+  distinct(pscid, m_m_precuneus_z, m_m_acc_z, plasma_ptau217_z, 
+           cortical_thickness_adsignature_dickson_z, hipp_mean_z, 
+           hipp_mean_act_z, activation_parietal_sup_l_z) %>%
+  mutate(
+    # in two 
+    precuneus_binary = as.factor(ntile(m_m_precuneus_z, 2)),
+    acc_binary       = as.factor(ntile(m_m_acc_z, 2)),
+    # Tertiles (3 groups: 1=Low, 2=Med, 3=High)
+    precuneus_tert = as.factor(ntile(m_m_precuneus_z, 3)),
+    acc_tert       = as.factor(ntile(m_m_acc_z, 3)),
+    ptau_tert      = as.factor(ntile(plasma_ptau217_z, 3)),
+    thick_tert     = as.factor(ntile(cortical_thickness_adsignature_dickson_z, 3)),
+    hipp_tert      = as.factor(ntile(hipp_mean_z, 3)),
+    hipp_act_tert  = as.factor(ntile(hipp_mean_act_z, 3)),
+    parietal_tert  = as.factor(ntile(activation_parietal_sup_l_z, 3)),
+    
+    # Quartiles (4 groups)
+    precuneus_quart = as.factor(ntile(m_m_precuneus_z, 4)),
+    acc_quart       = as.factor(ntile(m_m_acc_z, 4)),
+    ptau_quart      = as.factor(ntile(plasma_ptau217_z, 4)),
+    thick_quart     = as.factor(ntile(cortical_thickness_adsignature_dickson_z, 4)),
+    hipp_quart      = as.factor(ntile(hipp_mean_z, 4)),
+    hipp_act_quart  = as.factor(ntile(hipp_mean_act_z, 4)),
+    parietal_quart  = as.factor(ntile(activation_parietal_sup_l_z, 4))
+  ) %>%
+  select(pscid, ends_with("_tert"), ends_with("_quart"))
+
+# 2. Join these new grouping variables back to your longitudinal dataset
+MRS_prediction_long <- left_join(MRS_prediction_long, subject_groups, by = "pscid")
+
+
+
+library(lmerTest) # For p-values in summary()
+
+# --- PRECUNEUS TERTILES ---
+# Tertile 1 (Low)
+summary(lmer(moca ~ years_from_baseline + sexe + diagnostic_nick + education  + (1 | pscid), 
+             data = subset(MRS_prediction_long, precuneus_tert == 1)))
+
+# Tertile 2 (Medium)
+summary(lmer(moca ~ years_from_baseline + sexe + diagnostic_nick + education + (1 | pscid), 
+             data = subset(MRS_prediction_long, precuneus_tert == 2)))
+
+# Tertile 3 (High)
+summary(lmer(moca ~ years_from_baseline + sexe + diagnostic_nick + education  + (1 | pscid), 
+             data = subset(MRS_prediction_long, precuneus_tert == 3)))
+
+
+# --- PRECUNEUS QUARTILES ---
+# Quartile 1 
+summary(lmer(moca ~ years_from_baseline + sexe + diagnostic_nick + education  + (1 | pscid), 
+             data = subset(MRS_prediction_long, precuneus_quart == 1)))
+# Quartile 4
+summary(lmer(moca ~ years_from_baseline + sexe + diagnostic_nick + education +  + (1 | pscid), 
+             data = subset(MRS_prediction_long, precuneus_quart == 4)))
+
+
+library(emmeans)
+
+# 1. Precuneus Tertile Model
+mod_precuneus_tert <- lmer(moca ~ years_from_baseline * precuneus_tert + sexe + diagnostic_nick + education  + (1 | pscid),  
+                           data = MRS_prediction_long)
+
+anova(mod_precuneus_tert) # Tells you if the interaction (differences between groups) is significant
+
+# Get the slope of years_from_baseline for each of the 3 groups
+emtrends(mod_precuneus_tert, specs = ~ precuneus_tert, var = "years_from_baseline")
+
+
+# 2. Precuneus Quartile Model
+mod_precuneus_quart <- lmer(moca ~ years_from_baseline * precuneus_quart + sexe + diagnostic_nick + education + initiale_age + (1 | pscid),  
+                            data = MRS_prediction_long)
+
+emtrends(mod_precuneus_quart, specs = ~ precuneus_quart, var = "years_from_baseline")
+
+
+# 3. pTau217 Tertile Model
+mod_ptau_tert <- lmer(moca ~ years_from_baseline * ptau_tert + age_difference + sexe + diagnostic_nick + education + initiale_age + (1 | pscid),  
+                      data = MRS_prediction_long)
+
+emtrends(mod_ptau_tert, specs = ~ ptau_tert, var = "years_from_baseline")
+
+
+# 4. Hippocampus Activation Quartile Model
+mod_hipp_act_quart <- lmer(moca ~ years_from_baseline * hipp_act_quart + sexe + diagnostic_nick + education + initiale_age + (1 | pscid),  
+                           data = MRS_prediction_long)
+
+emtrends(mod_hipp_act_quart, specs = ~ hipp_act_quart, var = "years_from_baseline")
+
+
+
+
+library(emmeans)
+library(lmerTest)
+
+# 1. Run the model with the 3-group tertile variable
+mod_prec_tert <- lmer(moca ~ years_from_baseline * precuneus_tert + sexe + diagnostic_nick + education  + (1 | pscid),  
+                      data = MRS_prediction_long)
+
+# 2. Get the slopes and their significance FOR EACH GROUP
+trends_tert <- emtrends(mod_prec_tert, specs = ~ precuneus_tert, var = "years_from_baseline")
+
+# Adding 'infer = TRUE' gives you the p-value showing if the slope for "Low", "Med", or "High" is significantly different from zero
+summary(trends_tert, infer = TRUE)
+
+# 3. Compare the groups against each other (e.g., is "High" slope significantly different from "Low" slope?)
+pairs(trends_tert)
 
 
 
