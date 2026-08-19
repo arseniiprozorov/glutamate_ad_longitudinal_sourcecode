@@ -534,40 +534,90 @@ summary(final_lmer_model)
 
 
 
-########## Forward ###########
-install.packages("buildmer")
+
+# 1. Install required packages (if not already installed)
+install.packages("combinat")
+# install.packages("dplyr")
+library(combinat)
 library(lme4)
-library(buildmer)
+library(dplyr)
 
-# 2. Use your existing clean dataset
-# (Ensure there are no missing values, just as you did for the backward step)
-vars_to_keep <- c("moca", "years_from_baseline", 
-                  "m_m_precuneus_z", "m_m_acc_z", "plasma_ptau217_z", 
-                  "cortical_thickness_adsignature_dickson_z", "arsenii_hippocampus_avg_act", 
-                  "age_difference", "sexe", "diagnostic_nick", "education", "initiale_age", "pscid")
+# 2. Define the 5 independent blocks (including their temporal interactions)
+blocks <- list(
+  Tau = "years_from_baseline * plasma_ptau217_z",
+  Precuneus = "years_from_baseline * m_m_precuneus_z",
+  ACC = "years_from_baseline * m_m_acc_z",
+  Thickness = "years_from_baseline * cortical_thickness_adsignature_dickson_z",
+  Activation = "years_from_baseline * arsenii_hippocampus_avg_act"
+)
 
-MRS_clean <- MRS_prediction_long[, vars_to_keep]
-MRS_clean <- MRS_clean[complete.cases(MRS_clean), ]
+# 3. Define the base clinical model
+base_form <- "moca ~ years_from_baseline + sexe + diagnostic_nick + education + initiale_age + age_difference + (1 | pscid)"
 
-# 3. Define the maximum saturated formula (everything you want it to consider)
-# Note: buildmer takes the formula as an object
-max_formula <- moca ~ years_from_baseline * (m_m_precuneus_z + 
-                                               m_m_acc_z + 
-                                               plasma_ptau217_z + 
-                                               cortical_thickness_adsignature_dickson_z + 
-                                               arsenii_hippocampus_avg_act) + 
-  age_difference + sexe + diagnostic_nick + education + initiale_age + 
-  (1 | pscid)
+# 4. Generate all 120 permutations of the 5 blocks
+block_names <- names(blocks)
+all_perms <- permn(block_names)
 
-# 4. Run the automated forward selection
-# direction = "forward" tells it to start with the simplest model (just the intercept) 
-# and add terms one by one based on likelihood ratio tests until the model stops improving.
-forward_model <- buildmer(max_formula, 
-                          data = MRS_clean, 
-                          buildmerControl = buildmerControl(direction = "forward"))
+# 5. Loop through all 120 permutations 
+# (This will run 720 mixed models. It takes about 15-30 seconds to run)
+cat("Running 120 permutations... Please wait.\n")
+results_list <- list()
 
-# 5. View the final selected model
-summary(forward_model)
+for (i in seq_along(all_perms)) {
+  order <- all_perms[[i]]
+  
+  # Fit models iteratively
+  m0 <- lmer(as.formula(base_form), data = MRS_final_clean, REML = FALSE)
+  
+  f1 <- paste(base_form, "+", blocks[[order[1]]])
+  m1 <- lmer(as.formula(f1), data = MRS_final_clean, REML = FALSE)
+  
+  f2 <- paste(f1, "+", blocks[[order[2]]])
+  m2 <- lmer(as.formula(f2), data = MRS_final_clean, REML = FALSE)
+  
+  f3 <- paste(f2, "+", blocks[[order[3]]])
+  m3 <- lmer(as.formula(f3), data = MRS_final_clean, REML = FALSE)
+  
+  f4 <- paste(f3, "+", blocks[[order[4]]])
+  m4 <- lmer(as.formula(f4), data = MRS_final_clean, REML = FALSE)
+  
+  f5 <- paste(f4, "+", blocks[[order[5]]])
+  m5 <- lmer(as.formula(f5), data = MRS_final_clean, REML = FALSE)
+  
+  # Run ANOVA to test the addition of each block
+  a_res <- anova(m0, m1, m2, m3, m4, m5)
+  p_vals <- a_res$`Pr(>Chisq)`[-1] # Remove the NA for the base model
+  
+  # Save the results
+  res <- data.frame(
+    Sequence = paste(order, collapse = " -> "),
+    Added_Variable = order,
+    Position_Added = 1:5,
+    P_Value = p_vals
+  )
+  results_list[[i]] <- res
+}
+
+# 6. Combine everything into one giant dataset
+final_permutation_results <- do.call(rbind, results_list)
+
+# 7. Create the Dominance Analysis Summary Table
+summary_table <- final_permutation_results %>%
+  group_by(Added_Variable, Position_Added) %>%
+  summarise(
+    Times_Tested = n(),
+    Times_Significant = sum(P_Value < 0.05),
+    Percent_Significant = (Times_Significant / Times_Tested) * 100,
+    Avg_P_Value = round(mean(P_Value), 3),
+    .groups = "drop"
+  ) %>%
+  arrange(Added_Variable, Position_Added)
+
+# Print the final pattern table!
+print(as.data.frame(summary_table))
+
+
+
 
 ################# Logistic regression ######################
 names(MRS_prediction)
