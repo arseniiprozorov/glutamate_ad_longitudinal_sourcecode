@@ -486,6 +486,89 @@ anova(mod_base, mod_glut, mod_tau, mod_act, mod_thick)
 
 
 
+
+### Backward stepwise ###
+# 1. Load required libraries
+library(lme4)
+library(lmerTest) # CRITICAL: This package provides the step() function for lmer models
+
+# 2. Define variables and create clean dataset (complete cases required for stepwise)
+vars_to_keep <- c("moca", "years_from_baseline", 
+                  "m_m_precuneus_z", "m_m_acc_z", "plasma_ptau217_z", 
+                  "cortical_thickness_adsignature_dickson_z", "arsenii_hippocampus_avg_act", 
+                  "age_difference", "sexe", "diagnostic_nick", "education", "initiale_age", "pscid")
+
+MRS_clean <- MRS_prediction_long[, vars_to_keep]
+MRS_clean <- MRS_clean[complete.cases(MRS_clean), ]
+
+# 3. Fit the FULL mixed-effects model
+# Note: Use REML = FALSE when comparing models with different fixed effects
+full_mixed_model <- lmer(
+  moca ~ years_from_baseline * (m_m_precuneus_z + 
+                                  m_m_acc_z + 
+                                  plasma_ptau217_z + 
+                                  cortical_thickness_adsignature_dickson_z + 
+                                  arsenii_hippocampus_avg_act) + 
+    age_difference + sexe + diagnostic_nick + education + initiale_age + 
+    (1 | pscid), 
+  data = MRS_clean, 
+  REML = FALSE
+)
+
+# 4. Run the backward stepwise elimination
+# reduce.random = FALSE ensures the subject-level intercept (1 | pscid) is never eliminated
+# alpha.fixed = 0.05 sets the p-value threshold for keeping fixed effects
+step_result <- step(full_mixed_model, reduce.random = FALSE, alpha.fixed = 0.05)
+
+# 5. Print the elimination log 
+# This is highly valuable for the manuscript: it tells you exactly the order variables were dropped
+print(step_result)
+
+# 6. Extract the final "winning" parsimonious model
+final_lmer_model <- get_model(step_result)
+
+# 7. View the summary to extract your final Beta estimates and p-values
+summary(final_lmer_model)
+
+
+
+
+
+########## Forward ###########
+install.packages("buildmer")
+library(lme4)
+library(buildmer)
+
+# 2. Use your existing clean dataset
+# (Ensure there are no missing values, just as you did for the backward step)
+vars_to_keep <- c("moca", "years_from_baseline", 
+                  "m_m_precuneus_z", "m_m_acc_z", "plasma_ptau217_z", 
+                  "cortical_thickness_adsignature_dickson_z", "arsenii_hippocampus_avg_act", 
+                  "age_difference", "sexe", "diagnostic_nick", "education", "initiale_age", "pscid")
+
+MRS_clean <- MRS_prediction_long[, vars_to_keep]
+MRS_clean <- MRS_clean[complete.cases(MRS_clean), ]
+
+# 3. Define the maximum saturated formula (everything you want it to consider)
+# Note: buildmer takes the formula as an object
+max_formula <- moca ~ years_from_baseline * (m_m_precuneus_z + 
+                                               m_m_acc_z + 
+                                               plasma_ptau217_z + 
+                                               cortical_thickness_adsignature_dickson_z + 
+                                               arsenii_hippocampus_avg_act) + 
+  age_difference + sexe + diagnostic_nick + education + initiale_age + 
+  (1 | pscid)
+
+# 4. Run the automated forward selection
+# direction = "forward" tells it to start with the simplest model (just the intercept) 
+# and add terms one by one based on likelihood ratio tests until the model stops improving.
+forward_model <- buildmer(max_formula, 
+                          data = MRS_clean, 
+                          buildmerControl = buildmerControl(direction = "forward"))
+
+# 5. View the final selected model
+summary(forward_model)
+
 ################# Logistic regression ######################
 names(MRS_prediction)
 ## Overal model sig
