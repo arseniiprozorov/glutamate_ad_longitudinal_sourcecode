@@ -215,12 +215,23 @@ citation("lmerTest")
 names(MRS_prediction_long)
 levels(MRS_prediction_long$diagnostic_nick)
 
-#sink("Table 2")
+sink("Table 2.txt")
 ## Baseline model
 mixed_model_moca <- lmer(moca ~ years_from_baseline + sexe + diagnostic_nick + education + initiale_age + (1 | pscid),  
                          data = MRS_prediction_long)
 summary(mixed_model_moca)
 
+#   pTau217 
+mixed_model_ptau217 <- lmer(moca ~ years_from_baseline * plasma_ptau217_z + age_difference + sexe + diagnostic_nick + education + initiale_age +(1 | pscid),  
+                            data = MRS_prediction_long)
+summary(mixed_model_ptau217)
+
+#tau217_slopes <- emtrends(mixed_model_ptau217, specs = ~ plasma_ptau217_z, 
+#                       var = "years_from_baseline", 
+#                       at = list(plasma_ptau217_z = c(-1, 0, 1)))
+#summary(tau217_slopes, infer = TRUE)
+
+#anova(mixed_model_ptau217)
 #   Glutamate 
 mixed_model_precuneus <- lmer(moca ~  m_m_precuneus_z * years_from_baseline + sexe + diagnostic_nick + education + (1 | pscid),  
   data = MRS_prediction_long)
@@ -247,16 +258,7 @@ summary(mixed_model_acc)
 
 
 
-#   pTau217 
-mixed_model_ptau217 <- lmer(moca ~ years_from_baseline * plasma_ptau217_z + age_difference + sexe + diagnostic_nick + education + initiale_age +(1 | pscid),  
-  data = MRS_prediction_long)
-summary(mixed_model_ptau217)
 
-#tau217_slopes <- emtrends(mixed_model_ptau217, specs = ~ plasma_ptau217_z, 
-#                       var = "years_from_baseline", 
-#                       at = list(plasma_ptau217_z = c(-1, 0, 1)))
-#summary(tau217_slopes, infer = TRUE)
-#anova(mixed_model_ptau217)
 
 # Structure
 mixed_model_thickness <- lmer(
@@ -339,89 +341,86 @@ step_result <- ols_step_backward_p(full_model, prem = 0.10, details = TRUE)
 print(step_result)
 summary(step_result$model)
 
-#sink()
-
-
-
-# ==============================================================================
-#  Fit Tertile Mixed-Effects Models & Evaluate Slopes
-# ==============================================================================
-
-# 1. Plasma p-tau217
-res_ptau <- run_tertile_posthoc(
-  moca ~ years_from_baseline * ptau217_tert + age_difference + sexe + diagnostic_nick + education + initiale_age + (1 | pscid),
-  "ptau217_tert", "Plasma p-tau217"
-)
-
-# 2. Precuneus Glutamate
-res_precuneus <- run_tertile_posthoc(
-  moca ~ years_from_baseline * precuneus_tert + sexe + diagnostic_nick + education + (1 | pscid),
-  "precuneus_tert", "Precuneus Glutamate"
-)
-
-# 3. ACC Glutamate
-res_acc <- run_tertile_posthoc(
-  moca ~ years_from_baseline * acc_tert + sexe + diagnostic_nick + education + initiale_age + (1 | pscid),
-  "acc_tert", "ACC Glutamate"
-)
-
-# 4. AD-Signature Cortical Thickness
-res_thick <- run_tertile_posthoc(
-  moca ~ years_from_baseline * thickness_tert + sexe + diagnostic_nick + education + initiale_age + (1 | pscid),
-  "thickness_tert", "Cortical Thickness"
-)
-
-# 5. Hippocampal Activation
-res_hipp_act <- run_tertile_posthoc(
-  moca ~ years_from_baseline * hipp_act_tert + sexe + diagnostic_nick + education + initiale_age + (1 | pscid),
-  "hipp_act_tert", "Hippocampal Activation"
-)
-
 
 
 
 ########### Post hoc with tertials ########
-library(lme4)
-library(lmerTest)
-library(emmeans)
 
-# ==============================================================================
-# 1. Create Tertile Factor Columns (Low, Medium, High)
-# ==============================================================================
-make_tertile <- function(x) {
-  cut(
-    x,
-    breaks = quantile(x, probs = seq(0, 1, length.out = 4), na.rm = TRUE),
-    include.lowest = TRUE,
-    labels = c("Low", "Medium", "High")
-  )
-}
+# Create Tertile Factor Variables (Low, Medium, High)
 
-MRS_prediction_long$ptau217_tert    <- make_tertile(MRS_prediction_long$plasma_ptau217_z)
-MRS_prediction_long$precuneus_tert  <- make_tertile(MRS_prediction_long$m_m_precuneus_z)
-MRS_prediction_long$acc_tert        <- make_tertile(MRS_prediction_long$m_m_acc_z)
-MRS_prediction_long$thickness_tert  <- make_tertile(MRS_prediction_long$cortical_thickness_adsignature_dickson_z)
-MRS_prediction_long$hipp_act_tert   <- make_tertile(MRS_prediction_long$arsenii_hippocampus_avg_act)
+# Plasma p-Tau217
+q_ptau <- quantile(MRS_prediction_long$plasma_ptau217_z, probs = c(0, 1/3, 2/3, 1), na.rm = TRUE)
+MRS_prediction_long$ptau217_tert <- cut(MRS_prediction_long$plasma_ptau217_z, breaks = q_ptau, 
+                                        labels = c("Low", "Medium", "High"), include.lowest = TRUE)
 
-# Helper function to fit model, compute simple slopes, and test pairwise contrasts
-run_tertile_posthoc <- function(formula, tert_var, model_name) {
-  cat("\n======================================================================\n")
-  cat(" Tertile Model & Post-Hoc Slopes:", model_name, "\n")
-  cat("======================================================================\n")
-  
-  mod <- lmer(formula, data = MRS_prediction_long)
-  
-  # Calculate yearly rate of change per tertile
-  slopes <- emtrends(mod, specs = as.formula(paste("~", tert_var)), var = "years_from_baseline")
-  
-  cat("\n--- Estimated Annual MoCA Slopes per Tertile ---\n")
-  print(summary(slopes, infer = TRUE))
-  
-  cat("\n--- Pairwise Slope Comparisons (Difference in Rates of Change) ---\n")
-  print(pairs(slopes))
-  
-  return(list(model = mod, slopes = slopes))
-}
+# ACC Glutamate
+q_acc <- quantile(MRS_prediction_long$m_m_acc_z, probs = c(0, 1/3, 2/3, 1), na.rm = TRUE)
+MRS_prediction_long$acc_tert <- cut(MRS_prediction_long$m_m_acc_z, breaks = q_acc, 
+                                    labels = c("Low", "Medium", "High"), include.lowest = TRUE)
+
+# Precuneus Glutamate
+q_prec <- quantile(MRS_prediction_long$m_m_precuneus_z, probs = c(0, 1/3, 2/3, 1), na.rm = TRUE)
+MRS_prediction_long$precuneus_tert <- cut(MRS_prediction_long$m_m_precuneus_z, breaks = q_prec, 
+                                          labels = c("Low", "Medium", "High"), include.lowest = TRUE)
+
+# Cortical Thickness (AD-Signature)
+q_thick <- quantile(MRS_prediction_long$cortical_thickness_adsignature_dickson_z, probs = c(0, 1/3, 2/3, 1), na.rm = TRUE)
+MRS_prediction_long$thickness_tert <- cut(MRS_prediction_long$cortical_thickness_adsignature_dickson_z, breaks = q_thick, 
+                                          labels = c("Low", "Medium", "High"), include.lowest = TRUE)
+
+# Hippocampal Activation
+q_hip <- quantile(MRS_prediction_long$arsenii_hippocampus_avg_act, probs = c(0, 1/3, 2/3, 1), na.rm = TRUE)
+MRS_prediction_long$hipp_act_tert <- cut(MRS_prediction_long$arsenii_hippocampus_avg_act, breaks = q_hip, 
+                                         labels = c("Low", "Medium", "High"), include.lowest = TRUE)
+
+# 1. Plasma p-Tau217 Tertiles
+mod_ptau_tert <- lmer(moca ~ years_from_baseline * ptau217_tert + age_difference + sexe + 
+                        diagnostic_nick + education + initiale_age + (1 | pscid), data = MRS_prediction_long)
+
+slopes_ptau <- emtrends(mod_ptau_tert, ~ ptau217_tert, var = "years_from_baseline")
+summary(slopes_ptau, infer = TRUE)
+pairs(slopes_ptau)
+
+# 2. ACC Glutamate Tertiles
+mod_acc_tert <- lmer(moca ~ years_from_baseline * acc_tert + sexe + diagnostic_nick + 
+                       education + initiale_age + (1 | pscid), data = MRS_prediction_long)
+
+slopes_acc <- emtrends(mod_acc_tert, ~ acc_tert, var = "years_from_baseline")
+summary(slopes_acc, infer = TRUE)
+pairs(slopes_acc)
+
+names(MRS_prediction_long)
+# 3. Precuneus Glutamate Tertiles
+
+mod_prec_tert <- lmer(moca ~ years_from_baseline * precuneus_tert + sexe + diagnostic_nick + 
+                        education + (1 | pscid), data = MRS_prediction_long)
+
+slopes_prec <- emtrends(mod_prec_tert, ~ precuneus_tert, var = "years_from_baseline")
+summary(slopes_prec, infer = TRUE)
+pairs(slopes_prec)
+
+
+# 4. AD-Signature Cortical Thickness Tertiles
+mod_thick_tert <- lmer(moca ~ years_from_baseline * thickness_tert + sexe + diagnostic_nick + 
+                         education + initiale_age + (1 | pscid), data = MRS_prediction_long)
+
+slopes_thick <- emtrends(mod_thick_tert, ~ thickness_tert, var = "years_from_baseline")
+summary(slopes_thick, infer = TRUE)
+pairs(slopes_thick)
+
+
+# 5. Hippocampal Activation Tertiles
+mod_hip_tert <- lmer(moca ~ years_from_baseline * hipp_act_tert + sexe + diagnostic_nick + 
+                       education + initiale_age + (1 | pscid), data = MRS_prediction_long)
+
+# Slopes & Pairwise Tests
+slopes_hip <- emtrends(mod_hip_tert, ~ hipp_act_tert, var = "years_from_baseline")
+summary(slopes_hip, infer = TRUE)
+pairs(slopes_hip)
+
+
+sink()
+
 
 ################# Objective 2.  Logistic regression ######################
 names(MRS_prediction)
@@ -435,7 +434,6 @@ overall_m_sig <- function(model) {
 
 
 #sink("glm_models_sensetivity_decliners.txt")
-
 
 # plasma_ptau217 
 model_glu_ptau217 <- glm(decliner_regression ~ plasma_ptau217_z  , data = MRS_prediction, family = "binomial")
@@ -499,17 +497,8 @@ overall_m_sig(model_func_hip)
 
 
 ############# Hierarchical models ############
-# 1. ACC Glutamate + Plasma p-Tau217 + cortical thickenss + covriates 
-model_full_step_sig <- glm(decliner_regression ~ plasma_ptau217_z + m_m_acc_z + cortical_thickness_adsignature_dickson_z 
-                           + sexe + initiale_age, data = MRS_prediction, family = "binomial")
-summary(model_full_step_sig)
 
-roc_model_full_step_sig <- roc(model_full_step_sig$y, fitted(model_full_step_sig))
-auc(roc_model_full_step_sig)
-coords(roc_model_full_step_sig, "best", ret=c("threshold", "specificity", "sensitivity"), best.method="youden")
-overall_m_sig(model_full_step_sig)
-
-# 2. ACC Glutamate + Plasma p-Tau217 + cortical thickenss 
+#  ACC Glutamate + Plasma p-Tau217 + cortical thickenss 
 model_nocov_step_sig <- glm(decliner_regression ~ plasma_ptau217_z + m_m_acc_z + cortical_thickness_adsignature_dickson_z 
                            , data = MRS_prediction, family = "binomial")
 summary(model_nocov_step_sig)
@@ -519,8 +508,7 @@ auc(roc_model_nocov_step_sig)
 coords(roc_model_nocov_step_sig, "best", ret=c("threshold", "specificity", "sensitivity"), best.method="youden")
 overall_m_sig(model_nocov_step_sig)
 
-############ 2 Variable Models ##############
-library(pROC)
+############ Exploratory 2 Variable Models ##############
 
 
 # 1. Plasma p-Tau217 and ACC Glutamate
@@ -583,91 +571,6 @@ overall_m_sig(model_acc_hip_act)
 
 
 
-############ One leave out cross validation ##############
-library(pROC)
-
-# 1. Define the master LOOCV function
-run_loocv <- function(formula_str, data, model_name) {
-  form <- as.formula(formula_str)
-  vars <- all.vars(form)
-  
-  # Isolate data for this specific model and drop missing observations
-  clean_data <- data[, vars, drop = FALSE]
-  clean_data <- clean_data[complete.cases(clean_data), ]
-  
-  n <- nrow(clean_data)
-  cv_predictions <- numeric(n)
-  
-  # Loop row-by-row (Leave One Out)
-  for (i in 1:n) {
-    train_set <- clean_data[-i, ]
-    test_set  <- clean_data[i, ]
-    
-    # Train on N-1 subjects
-    fit <- glm(form, data = train_set, family = "binomial")
-    
-    # Predict on the left-out subject
-    cv_predictions[i] <- predict(fit, newdata = test_set, type = "response")
-  }
-  
-  # Generate true out-of-sample ROC curves
-  actual_outcomes <- clean_data[[vars[1]]]
-  roc_cv <- pROC::roc(actual_outcomes, cv_predictions, quiet = TRUE)
-  
-  # Extract optimal threshold coordinates via Youden Index
-  coords_cv <- pROC::coords(roc_cv, "best", ret = c("threshold", "specificity", "sensitivity"), best.method = "youden")
-  if (!is.null(nrow(coords_cv)) && nrow(coords_cv) > 1) coords_cv <- coords_cv[1, ]
-  
-  # Calculate true out-of-sample classification accuracy
-  predicted_classes <- ifelse(cv_predictions >= coords_cv$threshold, 1, 0)
-  acc_cv <- mean(predicted_classes == actual_outcomes)
-  
-  # Return metrics as a clean data frame row
-  return(data.frame(
-    Model  = model_name,
-    N_Obs  = n,
-    CV_AUC = round(pROC::auc(roc_cv) * 100, 1),
-    CV_ACC = round(acc_cv * 100, 1),
-    CV_SEN = round(coords_cv$sensitivity * 100, 1),
-    CV_SPE = round(coords_cv$specificity * 100, 1)
-  ))
-}
-
-# 2. Map every single one of your models to its exact formula string
-models_to_test <- list(
-  # --- Unimodal Models ---
-  c("decliner_regression ~ plasma_ptau217_z", "Unimodal: Plasma p-Tau217"),
-  c("decliner_regression ~ m_m_precuneus_z", "Unimodal: Precuneus Glutamate"),
-  c("decliner_regression ~ m_m_acc_z", "Unimodal: ACC Glutamate"),
-  c("decliner_regression ~ hipp_mean_z", "Unimodal: Hippocampal Volume"),
-  c("decliner_regression ~ cortical_thickness_adsignature_dickson_z", "Unimodal: Cortical Thickness"),
-  c("decliner_regression ~ hipp_mean_act_z", "Unimodal: Hippocampal Activation"),
-  c("decliner_regression ~ activation_parietal_sup_l_z", "Unimodal: Superior Parietal Activation"),
-  
-  # --- Bivariate Models ---
-  c("decliner_regression ~ plasma_ptau217_z + m_m_acc_z", "Bivariate: p-Tau217 + ACC Glu"),
-  c("decliner_regression ~ plasma_ptau217_z + m_m_precuneus_z", "Bivariate: p-Tau217 + Precuneus Glu"),
-  c("decliner_regression ~ m_m_precuneus_z + cortical_thickness_adsignature_dickson_z", "Bivariate: Precuneus Glu + Cortical Thickness"),
-  c("decliner_regression ~ m_m_acc_z + cortical_thickness_adsignature_dickson_z", "Bivariate: ACC Glu + Cortical Thickness"),
-  c("decliner_regression ~ m_m_precuneus_z + hipp_mean_z", "Bivariate: Precuneus Glu + Hippocampal Volume"),
-  c("decliner_regression ~ m_m_acc_z + hipp_mean_z", "Bivariate: ACC Glu + Hippocampal Volume"),
-  c("decliner_regression ~ m_m_precuneus_z + activation_parietal_sup_l_z", "Bivariate: Precuneus Glu + Parietal Activation"),
-  c("decliner_regression ~ m_m_acc_z + activation_parietal_sup_l_z", "Bivariate: ACC Glu + Parietal Activation"),
-  c("decliner_regression ~ m_m_precuneus_z + hipp_mean_act_z", "Bivariate: Precuneus Glu + Hippocampal Activation"),
-  c("decliner_regression ~ m_m_acc_z + hipp_mean_act_z", "Bivariate: ACC Glu + Hippocampal Activation"),
-  c("decliner_regression ~ m_m_precuneus_z + m_m_acc_z", "Bivariate: Precuneus Glu + ACC Glu")
-)
-
-# 3. Execute the cross-validation loop over your dataset
-loocv_results_list <- lapply(models_to_test, function(m) {
-  run_loocv(formula_str = m[1], data = MRS_prediction, model_name = m[2])
-})
-
-# 4. Bind into a clear, unified master results matrix
-master_loocv_table <- do.call(rbind, loocv_results_list)
-print(master_loocv_table)
-
-
 
 ################# # Objerctive 3 #######################
 ## Sruvival analysis #####
@@ -691,10 +594,10 @@ summary(surv_prec)
 exp(confint(surv_prec))
 
 summary(coxph(Surv(max_years_from_baseline, decliner_regression) ~ plasma_ptau217_z + initiale_age, data = MRS_prediction))
-summary(coxph(Surv(max_years_from_baseline, decliner_regression) ~ hipp_mean + initiale_age, data = MRS_prediction))
-summary(coxph(Surv(max_years_from_baseline, decliner_regression) ~ cortical_thickness_adsignature_dickson + initiale_age, data = MRS_prediction))
-summary(coxph(Surv(max_years_from_baseline, decliner_regression) ~ hipp_mean_act + initiale_age, data = MRS_prediction))
-summary(coxph(Surv(max_years_from_baseline, decliner_regression) ~ activation_parietal_sup_l + initiale_age, data = MRS_prediction))
+#summary(coxph(Surv(max_years_from_baseline, decliner_regression) ~ hipp_mean + initiale_age, data = MRS_prediction))
+summary(coxph(Surv(max_years_from_baseline, decliner_regression) ~ cortical_thickness_adsignature_dickson_z + initiale_age, data = MRS_prediction))
+summary(coxph(Surv(max_years_from_baseline, decliner_regression) ~ arsenii_hippocampus_avg_act + initiale_age, data = MRS_prediction))
+#summary(coxph(Surv(max_years_from_baseline, decliner_regression) ~ activation_parietal_sup_l + initiale_age, data = MRS_prediction))
 
 
 # full models
@@ -716,20 +619,20 @@ hip_act_tertiles <- quantile(MRS_prediction$arsenii_hippocampus_avg_act, probs =
 
 # Plasma p-Tau217
 MRS_prediction$ptau217_tertiales <- cut(MRS_prediction$plasma_ptau217_z, 
-  breaks = ptau217_tertiles, labels = c("Low p-Tau217", "Medium p-Tau217", "High p-Tau217"), 
-  include.lowest = TRUE)
+                                        breaks = ptau217_tertiles, labels = c("Low p-Tau217", "Medium p-Tau217", "High p-Tau217"), 
+                                        include.lowest = TRUE)
 
 #  acc
 MRS_prediction$acc_tertiales <- cut(MRS_prediction$m_m_acc_z, 
-                                 breaks = acc_terials, 
-                                 labels = c("Low ACC Glu", "Medium ACC Glu", "High ACC Glu"), 
-                                 include.lowest = TRUE)
+                                    breaks = acc_terials, 
+                                    labels = c("Low ACC Glu", "Medium ACC Glu", "High ACC Glu"), 
+                                    include.lowest = TRUE)
 
 #  precuneus
 MRS_prediction$precuneus_tertiales <- cut(MRS_prediction$m_m_precuneus_z, 
-                                    breaks = precuneus_terials, 
-                                    labels = c("Low Precuneus Glu", "Medium Precuneus Glu", "High Precuneus Glu"), 
-                                    include.lowest = TRUE)
+                                          breaks = precuneus_terials, 
+                                          labels = c("Low Precuneus Glu", "Medium Precuneus Glu", "High Precuneus Glu"), 
+                                          include.lowest = TRUE)
 
 
 # Cortical Thickness (AD-Signature)
@@ -743,7 +646,7 @@ MRS_prediction$hip_act_tertiales <- cut(MRS_prediction$arsenii_hippocampus_avg_a
                                         include.lowest = TRUE)
 
 
-#  Time to 50% Decline split by your ACC Glutamate groups
+
 # Plasma p-Tau217 Tertiles
 fit_ptau217 <- survfit(
   Surv(max_years_from_baseline, decliner_regression) ~ ptau217_tertiales, 
@@ -786,11 +689,8 @@ summary(surv_fit_full)
 summary(surv_fit_nocov)
 
 
-# ==============================================================================
 # 3. Model-Adjusted Median Survival Across Risk Strata (e.g., Low vs High ACC Glu)
-# ==============================================================================
 
-# Construct hypothetical participant profiles to test adjusted survival
 # (Evaluating ACC Glu tertile effects holding p-tau217 & thickness at mean = 0)
 new_cases_nocov <- data.frame(
   plasma_ptau217_z = c(0, 0, 0),
@@ -809,16 +709,6 @@ print(surv_pred_nocov)
 
 
 
-
-
-# Estimate the survival curve for a specific patient profile
-# (e.g., the average patient profile in your data)
-surv_curve <- survfit(surv_acc, newdata = MRS_prediction) 
-summary(surv_curve)
-surv_curve
-# Calculate the expected duration (Mean time to event)
-mean_time <- coxed(cox_model, newdata = my_data)
-mean_time$expected.duration
 
 
 

@@ -566,100 +566,576 @@ ggsurvplot(
   
   
   
-  
+  install.packages("ragg")
   
   
   
   ########################### Article figures ####################
+  library(ggplot2)
+  library(emmeans)
+  library(dplyr)
+  library(patchwork)
+  library(ggplot2)
+  library(emmeans)
+  library(dplyr)
+  library(patchwork)
+  library(ragg)
+  library(ggplot2)
+  library(emmeans)
+  library(patchwork)
+  library(ragg)
+  library(ggplot2)
+  library(emmeans)
+  library(patchwork)
+  
+  # ==============================================================================
+  # 1. Helper Function: Plot Adjusted Trajectories for Tertiles
+  # ==============================================================================
+  
+  plot_tertile_traj <- function(model, df, tert_var, plot_title, y_limits = c(24, 28)) {
+    
+    # a) Generate model-adjusted marginal predictions (Year 0 to 6)
+    pred_grid <- emmip(
+      model, 
+      as.formula(paste(tert_var, "~ years_from_baseline")), 
+      at = list(years_from_baseline = seq(0, 6, by = 0.5)),
+      plotit = FALSE, 
+      CIs = TRUE
+    )
+    
+    # Ensure clean factor levels
+    pred_grid$Tertile <- factor(pred_grid[[tert_var]], levels = c("Low", "Medium", "High"))
+    
+    # b) Prepare raw data for background spaghetti plots
+    valid_rows <- !is.na(df[[tert_var]]) & !is.na(df$moca)
+    df_plot <- df[valid_rows, ]
+    df_plot$Tertile <- factor(df_plot[[tert_var]], levels = c("Low", "Medium", "High"))
+    
+    # c) High-Contrast Palette (Red = At Risk, Blue = Medium, Green = Protective)
+    tert_colors <- c("Low" = "#E64B35", "Medium" = "#4DBBD5", "High" = "#00A087")
+    
+    # d) Build ggplot
+    p <- ggplot() +
+      geom_line(
+        data = df_plot,
+        aes(x = years_from_baseline, y = moca, group = pscid, color = Tertile),
+        alpha = 0.15, linewidth = 0.4
+      ) +
+      geom_ribbon(
+        data = pred_grid,
+        aes(x = years_from_baseline, ymin = LCL, ymax = UCL, fill = Tertile),
+        alpha = 0.20, color = NA
+      ) +
+      geom_line(
+        data = pred_grid,
+        aes(x = years_from_baseline, y = yvar, color = Tertile),
+        linewidth = 1.2
+      ) +
+      scale_color_manual(values = tert_colors) +
+      scale_fill_manual(values = tert_colors) +
+      scale_x_continuous(breaks = seq(0, 6, 1), limits = c(0, 6)) +
+      scale_y_continuous(breaks = seq(min(y_limits), max(y_limits), by = 1)) +
+      coord_cartesian(ylim = y_limits) + 
+      labs(
+        title = plot_title,
+        x = "Years from Baseline",
+        y = "MoCA Score",
+        color = "Baseline Tertile",
+        fill  = "Baseline Tertile"
+      ) +
+      theme_classic(base_size = 12, base_family = "Arial") +
+      theme(
+        plot.title       = element_text(face = "bold", size = 13),
+        axis.title       = element_text(face = "bold"),
+        legend.position  = "right",
+        legend.title     = element_text(face = "bold", size = 11),
+        legend.text      = element_text(size = 10),
+        plot.margin      = margin(10, 10, 10, 10)
+      )
+    
+    return(p)
+  }
+  
+  
+  # ==============================================================================
+  # 2. Build Individual Panels
+  # ==============================================================================
+  p_ptau  <- plot_tertile_traj(mod_ptau_tert, MRS_prediction_long, "ptau217_tert", "C. Plasma p-Tau217")
+  p_acc   <- plot_tertile_traj(mod_acc_tert, MRS_prediction_long, "acc_tert", "A. ACC Glutamate")
+  p_prec  <- plot_tertile_traj(mod_prec_tert, MRS_prediction_long, "precuneus_tert", "B. Precuneus Glutamate")
+  p_thick <- plot_tertile_traj(mod_thick_tert, MRS_prediction_long, "thickness_tert", "D. Cortical Thickness")
+  p_hip   <- plot_tertile_traj(mod_hip_tert, MRS_prediction_long, "hipp_act_tert", "E. Hippocampal Activation")
+  
+  # ==============================================================================
+  # 2. Patchwork Arrangement in Requested Order & Save
+  # Order: p-Tau217 (A), ACC (B), Precuneus (C), Cortical Thickness (D), Hippocampus (E)
+  # ==============================================================================
+  
+  combo_traj <- (p_ptau | p_acc) / 
+    (p_prec | p_thick) / 
+    (p_hip  | plot_spacer()) + 
+    plot_layout(guides = "collect") & 
+    theme(
+      legend.position = "right",
+      legend.box.margin = margin(10, 8, 0, 0)
+    )
+  
+  # Set target directory
+  out_dir <- "C:/Users/okkam/Desktop/labo/article 2/A&D"
+  if (!dir.exists(out_dir)) dir.create(out_dir, recursive = TRUE)
+  
+  # Base R tiff export (1200 DPI, LZW compression)
+  tiff(
+    filename    = file.path(out_dir, "fig1_longitudinal_tertile_trajectories_1200dpi.tiff"),
+    width       = 10.0, 
+    height      = 11.5, 
+    units       = "in",
+    res         = 1200, 
+    compression = "lzw"
+  )
+  print(combo_traj)
+  dev.off()
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
   
   
   library(ggplot2)
-  library(ggeffects)
+  library(emmeans)
   library(patchwork)
   
-  # Custom theme for publication-ready figures
-  theme_manuscript <- function() {
-    theme_classic(base_size = 12) +
-      theme(
-        plot.title = element_text(face = "bold", size = 13, hjust = 0.5),
-        axis.title = element_text(face = "bold", size = 11),
-        legend.position = "bottom",
-        legend.title = element_text(face = "bold", size = 10),
-        legend.text = element_text(size = 9),
-        panel.grid.major.y = element_line(color = "grey90", linewidth = 0.3)
-      )
-  }
+  # ==============================================================================
+  # 1. Helper Function: Plot Adjusted Trajectories for Tertiles
+  # ==============================================================================
   
-  # Helper function to plot predicted trajectories
-  plot_tertile_predictions <- function(model, terms, title, y_lab = "Predicted MoCA Score") {
-    preds <- ggpredict(model, terms = terms)
+  plot_tertile_traj <- function(model, df, tert_var, plot_title, y_limits = c(23, 29)) {
     
-    # Standardized palette: Blue (Low), Grey (Medium), Orange/Red (High)
-    pal <- c("Low" = "#2b83ba", "Medium" = "#999999", "High" = "#d7191c")
+    # a) Generate model-adjusted marginal predictions (Year 0 to 6)
+    pred_grid <- emmip(
+      model, 
+      as.formula(paste(tert_var, "~ years_from_baseline")), 
+      at = list(years_from_baseline = seq(0, 6, by = 0.5)),
+      plotit = FALSE, 
+      CIs = TRUE
+    )
     
-    ggplot(preds, aes(x = x, y = predicted, color = group, fill = group)) +
-      geom_line(linewidth = 1.2) +
-      geom_ribbon(aes(ymin = conf.low, ymax = conf.high), alpha = 0.15, color = NA) +
-      scale_color_manual(values = pal, name = "Tertile") +
-      scale_fill_manual(values = pal, name = "Tertile") +
-      labs(
-        title = title,
-        x = "Years from Baseline",
-        y = y_lab
+    # Ensure clean factor levels
+    pred_grid$Tertile <- factor(pred_grid[[tert_var]], levels = c("Low", "Medium", "High"))
+    
+    # b) Prepare raw data for background spaghetti plots
+    valid_rows <- !is.na(df[[tert_var]]) & !is.na(df$moca)
+    df_plot <- df[valid_rows, ]
+    df_plot$Tertile <- factor(df_plot[[tert_var]], levels = c("Low", "Medium", "High"))
+    
+    # c) High-Contrast Palette (Red = At Risk, Blue = Medium, Green = Protective)
+    tert_colors <- c("Low" = "#E64B35", "Medium" = "#4DBBD5", "High" = "#00A087")
+    
+    # d) Build ggplot
+    p <- ggplot() +
+      geom_line(
+        data = df_plot,
+        aes(x = years_from_baseline, y = moca, group = pscid, color = Tertile),
+        alpha = 0.15, linewidth = 0.4
       ) +
-      scale_x_continuous(breaks = seq(0, 8, by = 2), limits = c(0, 8)) +
-      scale_y_continuous(limits = c(22, 30)) +
-      theme_manuscript()
+      geom_ribbon(
+        data = pred_grid,
+        aes(x = years_from_baseline, ymin = LCL, ymax = UCL, fill = Tertile),
+        alpha = 0.20, color = NA
+      ) +
+      geom_line(
+        data = pred_grid,
+        aes(x = years_from_baseline, y = yvar, color = Tertile),
+        linewidth = 1.2
+      ) +
+      scale_color_manual(values = tert_colors) +
+      scale_fill_manual(values = tert_colors) +
+      scale_x_continuous(breaks = seq(0, 6, 1), limits = c(0, 6)) +
+      scale_y_continuous(breaks = seq(min(y_limits), max(y_limits), by = 1)) +
+      coord_cartesian(ylim = y_limits) + 
+      labs(
+        title = plot_title,
+        x = "Years from Baseline",
+        y = "MoCA Score",
+        color = "Baseline Tertile",
+        fill  = "Baseline Tertile"
+      ) +
+      theme_classic(base_size = 12, base_family = "Arial") +
+      theme(
+        plot.title       = element_text(face = "bold", size = 13),
+        axis.title       = element_text(face = "bold"),
+        legend.position  = "right",
+        legend.title     = element_text(face = "bold", size = 11),
+        legend.text      = element_text(size = 10),
+        plot.margin      = margin(10, 10, 10, 10)
+      )
+    
+    return(p)
   }
   
   # ==============================================================================
-  # Generate Individual Trajectory Plots
+  # 2. Build Individual Panels (Titles Matched to Grid Order)
   # ==============================================================================
   
-  # 1. Plasma p-tau217
-  p_tau <- plot_tertile_predictions(
-    res_ptau$model, 
-    terms = c("years_from_baseline [0:8 by=0.5]", "ptau217_tert"), 
-    title = "Plasma p-tau217"
-  )
-  
-  # 2. ACC Glutamate
-  p_acc <- plot_tertile_predictions(
-    res_acc$model, 
-    terms = c("years_from_baseline [0:8 by=0.5]", "acc_tert"), 
-    title = "ACC Glutamate"
-  )
-  
-  # 3. Precuneus Glutamate
-  p_prec <- plot_tertile_predictions(
-    res_precuneus$model, 
-    terms = c("years_from_baseline [0:8 by=0.5]", "precuneus_tert"), 
-    title = "Precuneus Glutamate"
-  )
-  
-  # 4. AD-Signature Cortical Thickness
-  p_thick <- plot_tertile_predictions(
-    res_thick$model, 
-    terms = c("years_from_baseline [0:8 by=0.5]", "thickness_tert"), 
-    title = "Cortical Thickness"
-  )
-  
-  # 5. Hippocampal Activation
-  p_hipp <- plot_tertile_predictions(
-    res_hipp_act$model, 
-    terms = c("years_from_baseline [0:8 by=0.5]", "hipp_act_tert"), 
-    title = "Hippocampal Activation"
-  )
+  p_ptau  <- plot_tertile_traj(mod_ptau_tert,  MRS_prediction_long, "ptau217_tert",   "A. Plasma p-Tau217")
+  p_acc   <- plot_tertile_traj(mod_acc_tert,   MRS_prediction_long, "acc_tert",       "B. ACC Glutamate")
+  p_prec  <- plot_tertile_traj(mod_prec_tert,  MRS_prediction_long, "precuneus_tert", "C. Precuneus Glutamate")
+  p_thick <- plot_tertile_traj(mod_thick_tert, MRS_prediction_long, "thickness_tert", "D. Cortical Thickness")
+  p_hip   <- plot_tertile_traj(mod_hip_tert,   MRS_prediction_long, "hipp_act_tert",  "E. Hippocampal Activation")
   
   # ==============================================================================
-  # Combine into a Multi-Panel Figure & Save
+  # 3. Patchwork Arrangement & Save
+  # Layout:
+  # [ A. p-Tau217 ]   [ B. ACC Glu    ]
+  # [ C. Prec Glu ]   [ D. Thickness  ]
+  # [ E. Hipp Act ]   [  (spacer)     ]
   # ==============================================================================
   
-  fig_multimodal_tertiles <- (p_acc | p_prec | p_tau) / (p_thick | p_hipp | plot_spacer()) +
+  combo_traj <- (p_ptau | p_acc) / 
+    (p_prec | p_thick) / 
+    (p_hip  | plot_spacer()) + 
     plot_layout(guides = "collect") & 
-    theme(legend.position = "bottom")
+    theme(
+      legend.position = "right",
+      legend.box.margin = margin(10, 8, 0, 0)
+    )
   
-  print(fig_multimodal_tertiles)
+  # Set target directory
+  out_dir <- "C:/Users/okkam/Desktop/labo/article 2/A&D"
+  if (!dir.exists(out_dir)) dir.create(out_dir, recursive = TRUE)
   
-  # Export at high resolution
-  ggsave("Figure_Tertile_Trajectories.png", fig_multimodal_tertiles, width = 11, height = 7.5, dpi = 300)
+  # Base R tiff export (1200 DPI, LZW compression)
+  tiff(
+    filename    = file.path(out_dir, "fig1_longitudinal_tertile_trajectories_1200dpi.tiff"),
+    width       = 10.0, 
+    height      = 11.5, 
+    units       = "in",
+    res         = 1200, 
+    compression = "lzw"
+  )
+  print(combo_traj)
+  dev.off()
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  #### Figure 2 ######
+  #### Figure 2 ######
+  library(pROC)
+  library(ggplot2)
+  library(patchwork)
+  
+  # ==============================================================================
+  # 0. Helper: Extract and Format ROC Dataframe with Explicit (0,0) and (1,1)
+  # ==============================================================================
+  get_roc_df <- function(roc_obj, model_name) {
+    df <- data.frame(
+      fpr = 1 - roc_obj$specificities,
+      tpr = roc_obj$sensitivities,
+      model = model_name
+    )
+    # Ensure strict (0,0) and (1,1) boundaries
+    df <- rbind(data.frame(fpr = 0, tpr = 0, model = model_name),
+                df,
+                data.frame(fpr = 1, tpr = 1, model = model_name))
+    # Sort strictly by FPR then TPR for clean geom_path drawing
+    df <- df[order(df$fpr, df$tpr), ]
+    rownames(df) <- NULL
+    return(df)
+  }
+  
+  # 1. Build tidy dataframes for Panel A (Unimodal)
+  df_acc   <- get_roc_df(roc_glu_acc, "ACC Glutamate")
+  df_prec  <- get_roc_df(roc_glu_prec, "Precuneus Glutamate")
+  df_thick <- get_roc_df(roc_struc_thick, "Cortical Thickness")
+  df_ptau  <- get_roc_df(roc_ptau217, "Plasma p-tau217")
+  df_hip   <- get_roc_df(roc_func_hip, "Hippocampal Act")
+  
+  df_unimodal <- rbind(df_acc, df_prec, df_thick, df_ptau, df_hip)
+  df_unimodal$model <- factor(df_unimodal$model, levels = c(
+    "ACC Glutamate", "Precuneus Glutamate", "Cortical Thickness", "Plasma p-tau217", "Hippocampal Act"
+  ))
+  
+  # 2. Build tidy dataframe for Panel B (Multimodal)
+  df_multi <- get_roc_df(roc_model_nocov_step_sig, "Multimodal")
+  
+  # ==============================================================================
+  # 1. Panel A: Unimodal Plot
+  # ==============================================================================
+  
+  unimodal_colors <- c(
+    "ACC Glutamate"       = "#00A087", # Protective Green/Teal
+    "Precuneus Glutamate" = "#4DBBD5", # Medium Blue/Cyan
+    "Cortical Thickness"  = "#3C5488", # Deep Navy
+    "Plasma p-tau217"     = "#F39B7F", # Coral Accent
+    "Hippocampal Act"     = "#7E6148"  # Muted Slate
+  )
+  
+  youden_uni <- data.frame(
+    model = c("ACC Glutamate", "Precuneus Glutamate", "Cortical Thickness", "Plasma p-tau217", "Hippocampal Act"),
+    fpr   = c(1 - 0.967, 1 - 0.787, 1 - 0.790, 1 - 0.929, 1 - 0.418),
+    tpr   = c(0.333,     0.591,     0.591,     0.333,     0.810)
+  )
+  youden_uni$model <- factor(youden_uni$model, levels = levels(df_unimodal$model))
+  
+  p_roc_uni <- ggplot() +
+    # Chance diagonal
+    geom_segment(
+      aes(x = 0, xend = 1, y = 0, yend = 1),
+      color = "grey65", linetype = "dashed", linewidth = 0.7
+    ) +
+    # ROC Curves via geom_path
+    geom_path(
+      data = df_unimodal,
+      aes(x = fpr, y = tpr, color = model),
+      linewidth = 1.0
+    ) +
+    # Optimal Operating Points (Youden)
+    geom_point(
+      data = youden_uni,
+      aes(x = fpr, y = tpr, color = model),
+      size = 2.8, shape = 19, show.legend = FALSE
+    ) +
+    scale_color_manual(values = unimodal_colors) +
+    scale_x_continuous(expand = c(0.01, 0.01), breaks = seq(0, 1, by = 0.2), limits = c(0, 1)) +
+    scale_y_continuous(expand = c(0.01, 0.01), breaks = seq(0, 1, by = 0.2), limits = c(0, 1)) +
+    labs(
+      title = "A. Unimodal Models",
+      x = "1 - Specificity",
+      y = "Sensitivity",
+      color = NULL
+    ) +
+    theme_classic(base_size = 12, base_family = "Arial") +
+    theme(
+      plot.title        = element_text(face = "bold", size = 13),
+      axis.title        = element_text(face = "bold", size = 11),
+      axis.text         = element_text(color = "black", size = 10),
+      legend.position   = c(0.62, 0.22),
+      legend.text       = element_text(size = 9, face = "bold"),
+      legend.background = element_rect(fill = alpha("white", 0.85), color = "grey85", linewidth = 0.5),
+      legend.key.height = unit(0.42, "cm"),
+      plot.margin       = margin(10, 15, 10, 10)
+    )
+  
+  # ==============================================================================
+  # 2. Panel B: Multimodal Plot
+  # ==============================================================================
+  
+  youden_multi <- data.frame(
+    fpr = 1 - 0.900,
+    tpr = 0.643
+  )
+  
+  p_roc_multi <- ggplot() +
+    # Chance diagonal
+    geom_segment(
+      aes(x = 0, xend = 1, y = 0, yend = 1),
+      color = "grey65", linetype = "dashed", linewidth = 0.7
+    ) +
+    # Multimodal Curve
+    geom_path(
+      data = df_multi,
+      aes(x = fpr, y = tpr),
+      color = "#E64B35", linewidth = 1.3
+    ) +
+    # Youden Point
+    geom_point(
+      data = youden_multi,
+      aes(x = fpr, y = tpr),
+      color = "#E64B35", size = 3.4, shape = 19
+    ) +
+    scale_x_continuous(expand = c(0.01, 0.01), breaks = seq(0, 1, by = 0.2), limits = c(0, 1)) +
+    scale_y_continuous(expand = c(0.01, 0.01), breaks = seq(0, 1, by = 0.2), limits = c(0, 1)) +
+    labs(
+      title = "B. Multimodal Model",
+      x = "1 - Specificity",
+      y = "Sensitivity"
+    ) +
+    theme_classic(base_size = 12, base_family = "Arial") +
+    theme(
+      plot.title      = element_text(face = "bold", size = 13),
+      axis.title      = element_text(face = "bold", size = 11),
+      axis.text       = element_text(color = "black", size = 10),
+      legend.position = "none",
+      plot.margin     = margin(10, 10, 10, 15)
+    )
+  
+  # ==============================================================================
+  # 3. Patchwork Arrangement & TIFF Export
+  # ==============================================================================
+  
+  combo_roc <- p_roc_uni | p_roc_multi
+  
+  out_dir <- "C:/Users/okkam/Desktop/labo/article 2/A&D"
+  if (!dir.exists(out_dir)) dir.create(out_dir, recursive = TRUE)
+  
+  tiff(
+    filename    = file.path(out_dir, "fig2_roc_curves_unimodal_multimodal_1200dpi.tiff"),
+    width       = 10.5,
+    height      = 5.5,
+    units       = "in",
+    res         = 1200,
+    compression = "lzw"
+  )
+  print(combo_roc)
+  dev.off()
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  ############ Figure 3 #########
+  library(survival)
+  library(survminer)
+  library(ggplot2)
+  library(patchwork)
+  
+  # ==============================================================================
+  # 1. Survival Fits & Explicit Factor/Color Alignment
+  # Level 1 = Red (#E64B35, High Risk / Low Glu)
+  # Level 2 = Cyan (#4DBBD5, Intermediate)
+  # Level 3 = Green (#00A087, Low Risk / High Glu)
+  # ==============================================================================
+  shared_labels <- c(
+    "Low Glutamate / High Multimodal Risk",
+    "Intermediate",
+    "High Glutamate / Low Multimodal Risk"
+  )
+  
+  # Unimodal factor coding
+  MRS_prediction$acc_tert_clean <- factor(
+    MRS_prediction$acc_tertiales,
+    labels = shared_labels
+  )
+  
+  MRS_prediction$prec_tert_clean <- factor(
+    MRS_prediction$precuneus_tertiales,
+    labels = shared_labels
+  )
+  
+  # Multimodal Risk Tertiles
+  MRS_prediction$multimodal_risk <- predict(cox_nocov, newdata = MRS_prediction, type = "lp")
+  risk_tertiles <- quantile(MRS_prediction$multimodal_risk, probs = c(0, 1/3, 2/3, 1), na.rm = TRUE)
+  
+  # Cut and align multimodal factor levels to match Red -> Blue -> Green
+  MRS_prediction$multimodal_risk_clean <- cut(
+    MRS_prediction$multimodal_risk,
+    breaks = risk_tertiles,
+    labels = c(shared_labels[3], shared_labels[2], shared_labels[1]),
+    include.lowest = TRUE
+  )
+  
+  MRS_prediction$multimodal_risk_clean <- factor(
+    MRS_prediction$multimodal_risk_clean,
+    levels = shared_labels
+  )
+  
+  # Fit survival models
+  fit_acc_km   <- survfit(Surv(max_years_from_baseline, decliner_regression) ~ acc_tert_clean, data = MRS_prediction)
+  fit_prec_km  <- survfit(Surv(max_years_from_baseline, decliner_regression) ~ prec_tert_clean, data = MRS_prediction)
+  fit_multi_km <- survfit(Surv(max_years_from_baseline, decliner_regression) ~ multimodal_risk_clean, data = MRS_prediction)
+  
+  # ==============================================================================
+  # 2. General KM Panel Function
+  # ==============================================================================
+  plot_km_panel <- function(fit, df, title_text) {
+    p <- ggsurvplot(
+      fit,
+      data = df,
+      size = 1.1,
+      palette = c("#E64B35", "#4DBBD5", "#00A087"), # Red = High Risk, Cyan = Intermediate, Green = Low Risk
+      censor.size = 2.2,
+      censor.shape = 3,
+      pval = FALSE,
+      conf.int = FALSE,
+      xlab = "Follow-up Duration (Years)",
+      ylab = "Cognitive Stability Probability",
+      title = title_text,
+      legend.title = "Stratum / Prognostic Profile",
+      legend.labs = shared_labels,
+      ggtheme = theme_classic(base_size = 12, base_family = "Arial") +
+        theme(
+          plot.title   = element_text(face = "bold", size = 13),
+          axis.title   = element_text(face = "bold", size = 11),
+          axis.text    = element_text(color = "black", size = 10),
+          legend.title = element_text(face = "bold", size = 10),
+          legend.text  = element_text(size = 9.5),
+          plot.margin  = margin(10, 10, 10, 10)
+        )
+    )
+    return(p$plot)
+  }
+  
+  # ==============================================================================
+  # 3. Build Panels
+  # ==============================================================================
+  p_acc  <- plot_km_panel(fit_acc_km,   MRS_prediction, "A. ACC Glutamate")
+  p_prec <- plot_km_panel(fit_prec_km,  MRS_prediction, "B. Precuneus Glutamate")
+  p_mult <- plot_km_panel(fit_multi_km, MRS_prediction, "C. Multimodal Risk Profile")
+  
+  # ==============================================================================
+  # 4. Patchwork Layout with Shared Bottom Legend & TIFF Export
+  # ==============================================================================
+  combo_km <- (p_acc | p_prec | p_mult) +
+    plot_layout(guides = "collect") &
+    theme(
+      legend.position   = "bottom",
+      legend.box.margin = margin(10, 0, 0, 0)
+    )
+  
+  # Display in Plots viewer
+  print(combo_km)
+  
+  # Save TIFF (1200 DPI, LZW Compression)
+  out_dir <- "C:/Users/okkam/Desktop/labo/article 2/A&D"
+  if (!dir.exists(out_dir)) dir.create(out_dir, recursive = TRUE)
+  
+  tiff(
+    filename    = file.path(out_dir, "fig3_kaplan_meier_survival_curves_1200dpi.tiff"),
+    width       = 14.5,
+    height      = 5.8,
+    units       = "in",
+    res         = 1200,
+    compression = "lzw"
+  )
+  print(combo_km)
+  dev.off()
