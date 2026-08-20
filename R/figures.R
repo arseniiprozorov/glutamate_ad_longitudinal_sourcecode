@@ -542,4 +542,124 @@ ggsurvplot(
   legend.title = "Metabolic Strata",
   legend = "top",
   ggtheme = theme_minimal() 
-)
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  ########################### Article figures ####################
+  
+  
+  library(ggplot2)
+  library(ggeffects)
+  library(patchwork)
+  
+  # Custom theme for publication-ready figures
+  theme_manuscript <- function() {
+    theme_classic(base_size = 12) +
+      theme(
+        plot.title = element_text(face = "bold", size = 13, hjust = 0.5),
+        axis.title = element_text(face = "bold", size = 11),
+        legend.position = "bottom",
+        legend.title = element_text(face = "bold", size = 10),
+        legend.text = element_text(size = 9),
+        panel.grid.major.y = element_line(color = "grey90", linewidth = 0.3)
+      )
+  }
+  
+  # Helper function to plot predicted trajectories
+  plot_tertile_predictions <- function(model, terms, title, y_lab = "Predicted MoCA Score") {
+    preds <- ggpredict(model, terms = terms)
+    
+    # Standardized palette: Blue (Low), Grey (Medium), Orange/Red (High)
+    pal <- c("Low" = "#2b83ba", "Medium" = "#999999", "High" = "#d7191c")
+    
+    ggplot(preds, aes(x = x, y = predicted, color = group, fill = group)) +
+      geom_line(linewidth = 1.2) +
+      geom_ribbon(aes(ymin = conf.low, ymax = conf.high), alpha = 0.15, color = NA) +
+      scale_color_manual(values = pal, name = "Tertile") +
+      scale_fill_manual(values = pal, name = "Tertile") +
+      labs(
+        title = title,
+        x = "Years from Baseline",
+        y = y_lab
+      ) +
+      scale_x_continuous(breaks = seq(0, 8, by = 2), limits = c(0, 8)) +
+      scale_y_continuous(limits = c(22, 30)) +
+      theme_manuscript()
+  }
+  
+  # ==============================================================================
+  # Generate Individual Trajectory Plots
+  # ==============================================================================
+  
+  # 1. Plasma p-tau217
+  p_tau <- plot_tertile_predictions(
+    res_ptau$model, 
+    terms = c("years_from_baseline [0:8 by=0.5]", "ptau217_tert"), 
+    title = "Plasma p-tau217"
+  )
+  
+  # 2. ACC Glutamate
+  p_acc <- plot_tertile_predictions(
+    res_acc$model, 
+    terms = c("years_from_baseline [0:8 by=0.5]", "acc_tert"), 
+    title = "ACC Glutamate"
+  )
+  
+  # 3. Precuneus Glutamate
+  p_prec <- plot_tertile_predictions(
+    res_precuneus$model, 
+    terms = c("years_from_baseline [0:8 by=0.5]", "precuneus_tert"), 
+    title = "Precuneus Glutamate"
+  )
+  
+  # 4. AD-Signature Cortical Thickness
+  p_thick <- plot_tertile_predictions(
+    res_thick$model, 
+    terms = c("years_from_baseline [0:8 by=0.5]", "thickness_tert"), 
+    title = "Cortical Thickness"
+  )
+  
+  # 5. Hippocampal Activation
+  p_hipp <- plot_tertile_predictions(
+    res_hipp_act$model, 
+    terms = c("years_from_baseline [0:8 by=0.5]", "hipp_act_tert"), 
+    title = "Hippocampal Activation"
+  )
+  
+  # ==============================================================================
+  # Combine into a Multi-Panel Figure & Save
+  # ==============================================================================
+  
+  fig_multimodal_tertiles <- (p_acc | p_prec | p_tau) / (p_thick | p_hipp | plot_spacer()) +
+    plot_layout(guides = "collect") & 
+    theme(legend.position = "bottom")
+  
+  print(fig_multimodal_tertiles)
+  
+  # Export at high resolution
+  ggsave("Figure_Tertile_Trajectories.png", fig_multimodal_tertiles, width = 11, height = 7.5, dpi = 300)
