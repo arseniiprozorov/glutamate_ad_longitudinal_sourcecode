@@ -571,22 +571,12 @@ ggsurvplot(
   
   
   ########################### Article figures ####################
-  library(ggplot2)
-  library(emmeans)
-  library(dplyr)
-  library(patchwork)
+  ########################### Article Figure 1 ####################
   library(ggplot2)
   library(emmeans)
   library(dplyr)
   library(patchwork)
   library(ragg)
-  library(ggplot2)
-  library(emmeans)
-  library(patchwork)
-  library(ragg)
-  library(ggplot2)
-  library(emmeans)
-  library(patchwork)
   
   # ==============================================================================
   # 1. Helper Function: Plot Adjusted Trajectories for Tertiles
@@ -656,24 +646,22 @@ ggsurvplot(
     return(p)
   }
   
-  
   # ==============================================================================
-  # 2. Build Individual Panels
+  # 2. Build Individual Panels in Requested Order:
+  # Order: Glutamate (A, B) -> fMRI (C) -> sMRI (D) -> Plasma p-tau217 (E)
   # ==============================================================================
-  p_ptau  <- plot_tertile_traj(mod_ptau_tert, MRS_prediction_long, "ptau217_tert", "C. Plasma p-Tau217")
-  p_acc   <- plot_tertile_traj(mod_acc_tert, MRS_prediction_long, "acc_tert", "A. ACC Glutamate")
-  p_prec  <- plot_tertile_traj(mod_prec_tert, MRS_prediction_long, "precuneus_tert", "B. Precuneus Glutamate")
+  p_acc   <- plot_tertile_traj(mod_acc_tert,   MRS_prediction_long, "acc_tert",       "A. ACC Glutamate")
+  p_prec  <- plot_tertile_traj(mod_prec_tert,  MRS_prediction_long, "precuneus_tert", "B. Precuneus Glutamate")
+  p_hip   <- plot_tertile_traj(mod_hip_tert,   MRS_prediction_long, "hipp_act_tert",  "C. Hippocampal Activation")
   p_thick <- plot_tertile_traj(mod_thick_tert, MRS_prediction_long, "thickness_tert", "D. Cortical Thickness")
-  p_hip   <- plot_tertile_traj(mod_hip_tert, MRS_prediction_long, "hipp_act_tert", "E. Hippocampal Activation")
+  p_ptau  <- plot_tertile_traj(mod_ptau_tert,  MRS_prediction_long, "ptau217_tert",   "E. Plasma p-Tau217")
   
   # ==============================================================================
-  # 2. Patchwork Arrangement in Requested Order & Save
-  # Order: p-Tau217 (A), ACC (B), Precuneus (C), Cortical Thickness (D), Hippocampus (E)
+  # 3. Patchwork Arrangement & Save
   # ==============================================================================
-  
-  combo_traj <- (p_ptau | p_acc) / 
-    (p_prec | p_thick) / 
-    (p_hip  | plot_spacer()) + 
+  combo_traj <- (p_acc | p_prec) / 
+    (p_hip | p_thick) / 
+    (p_ptau | plot_spacer()) + 
     plot_layout(guides = "collect") & 
     theme(
       legend.position = "right",
@@ -689,15 +677,12 @@ ggsurvplot(
     filename    = file.path(out_dir, "fig1_longitudinal_tertile_trajectories_1200dpi.tiff"),
     width       = 10.0, 
     height      = 11.5, 
-    units       = "in",
+    units       = "in", 
     res         = 1200, 
     compression = "lzw"
   )
   print(combo_traj)
   dev.off()
-  
-  
-  
   
   
   
