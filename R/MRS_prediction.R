@@ -86,6 +86,51 @@ jmv::descriptives(data = MRS_prediction, vars = vars(slope_regression_yearly, m_
 
 
 
+
+
+
+
+
+
+# Mean years prior to baseline for the T-1 subsample
+mean(abs(tau_diff[!is.na(MRS_prediction$plasma_ptau217) & tau_diff < -0.25]))
+# ==============================================================================
+# Plasma p-tau217 Timing Relative to Baseline (initiale_age)
+# ==============================================================================
+
+# Calculate time difference in years (age at blood draw minus baseline age)
+tau_diff <- MRS_prediction$age_tau - MRS_prediction$initiale_age
+
+# Define timing categories:
+# - T-1: blood draw before baseline (< -0.25 years / 3 months prior)
+# - T0: concurrent with baseline (within +/- 3 months, or exact match)
+# - After: blood draw after baseline (> +0.25 years)
+ptau_breakdown <- table(
+  Timing = ifelse(
+    is.na(MRS_prediction$plasma_ptau217), "Missing p-tau",
+    ifelse(tau_diff < -0.25, "T-1 (Prior / >3 mo before)",
+           ifelse(tau_diff > 0.25, "After Baseline (>3 mo after)", 
+                  "T0 (Concurrent Baseline)"))
+  ),
+  useNA = "ifany"
+)
+
+cat("--- Exact Breakdown of Plasma p-tau217 Timing ---\n")
+print(ptau_breakdown)
+
+# Check the distribution/summary of the age difference for available p-tau
+cat("\n--- Summary of (age_tau - initiale_age) in Years ---\n")
+print(summary(tau_diff[!is.na(MRS_prediction$plasma_ptau217)]))
+
+
+
+
+
+
+
+
+
+
 #### Calcul de score z
 MRS_prediction$m_m_precuneus_z <- scale(MRS_prediction$m_m_precuneus)
 MRS_prediction$m_m_acc_z <- scale(MRS_prediction$m_m_acc)
