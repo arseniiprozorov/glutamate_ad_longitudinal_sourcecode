@@ -374,8 +374,8 @@ MRS_step <- na.omit(MRS_prediction[, c("slope_regression_yearly", "m_m_acc_z",
 # 2. Full multivariable model & backward selection
 full_lm_model <- lm(slope_regression_yearly ~ m_m_acc_z + m_m_precuneus_z + plasma_ptau217_z + 
                       cortical_thickness_adsignature_dickson_z + arsenii_hippocampus_avg_act + 
-                      sexe + diagnostic_nick + education + initiale_age, 
-                    data = MRS_step_clean)
+                      sexe + diagnostic_nick + education + initiale_age + age_difference, 
+                    data = MRS_step)
 
 library(olsrr)
 step_result <- ols_step_backward_p(full_lm_model, prem = 0.10, details = TRUE)
