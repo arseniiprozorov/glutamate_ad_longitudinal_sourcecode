@@ -260,7 +260,7 @@ citation("lmerTest")
 names(MRS_prediction_long)
 levels(MRS_prediction_long$diagnostic_nick)
 
-sink("Table 2.txt")
+#sink("Table 2.txt")
 ## Baseline model
 mixed_model_moca <- lmer(moca ~ years_from_baseline + sexe + diagnostic_nick + education + initiale_age + (1 | pscid),  
                          data = MRS_prediction_long)
@@ -365,29 +365,24 @@ library(olsrr)
 
 ### Backward stepwise ###
 
-library(olsrr)
-
-# 1. Complete cases extraction
-vars <- c("slope_regression_yearly", "m_m_acc_z", "m_m_precuneus_z", "plasma_ptau217_z", 
-          "cortical_thickness_adsignature_dickson_z", "arsenii_hippocampus_avg_act", 
-          "sexe", "diagnostic_nick", "education", "initiale_age")
-
-MRS_step_clean <- na.omit(MRS_prediction[, vars])
+MRS_step <- na.omit(MRS_prediction[, c("slope_regression_yearly", "m_m_acc_z", 
+                                             "m_m_precuneus_z", "plasma_ptau217_z", 
+                                             "cortical_thickness_adsignature_dickson_z", 
+                                             "arsenii_hippocampus_avg_act", "sexe", 
+                                             "diagnostic_nick", "education", "initiale_age", "age_difference")])
 
 # 2. Full multivariable model & backward selection
-full_model <- lm(slope_regression_yearly ~ m_m_acc_z + m_m_precuneus_z + plasma_ptau217_z + 
-                   cortical_thickness_adsignature_dickson_z + arsenii_hippocampus_avg_act + 
-                   sexe + diagnostic_nick + education + initiale_age, 
-                 data = MRS_step_clean)
+full_lm_model <- lm(slope_regression_yearly ~ m_m_acc_z + m_m_precuneus_z + plasma_ptau217_z + 
+                      cortical_thickness_adsignature_dickson_z + arsenii_hippocampus_avg_act + 
+                      sexe + diagnostic_nick + education + initiale_age, 
+                    data = MRS_step_clean)
 
-step_result <- ols_step_backward_p(full_model, prem = 0.10, details = TRUE)
+library(olsrr)
+step_result <- ols_step_backward_p(full_lm_model, prem = 0.10, details = TRUE)
 
 # 3. Output
 print(step_result)
 summary(step_result$model)
-
-
-
 
 ########### Post hoc with tertials ########
 
