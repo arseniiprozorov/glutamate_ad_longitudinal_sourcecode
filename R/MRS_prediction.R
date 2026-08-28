@@ -359,8 +359,8 @@ summary(mixed_model_activation_parietal_l)
 # Syntax
 #ols_step_backward_p(OLS_mod0,prem=0.1)
 library(olsrr)
-
-
+help(package = olsrr)
+citation("olsrr")
 ########### backward stepwise lienar mixed regression ################
 
 ### Backward stepwise ###
@@ -378,7 +378,7 @@ full_lm_model <- lm(slope_regression_yearly ~ m_m_acc_z + m_m_precuneus_z + plas
                     data = MRS_step)
 
 library(olsrr)
-step_result <- ols_step_backward_p(full_lm_model, prem = 0.10, details = TRUE)
+step_result <- ols_step_backward_p(full_lm_model, p_val = 0.3, details = TRUE)
 
 # 3. Output
 print(step_result)
