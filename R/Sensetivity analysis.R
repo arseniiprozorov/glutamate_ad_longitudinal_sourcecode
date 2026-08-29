@@ -286,3 +286,37 @@ master_loocv_table <- do.call(rbind, loocv_results_list)
 print(master_loocv_table)
 
 
+
+
+### Assumptions ####
+library(gam)
+install.packages("gam")
+# 1. Plasma p-tau217
+gam_ptau217 <- gam(decliner_regression ~ s(plasma_ptau217_z), 
+                   data = MRS_prediction, 
+                   family = "binomial")
+summary(gam_ptau217)
+
+# 2. Precuneus Glutamate
+gam_prec <- gam(decliner_regression ~ s(m_m_precuneus_z), 
+                data = MRS_prediction, 
+                family = "binomial")
+summary(gam_prec)
+
+# 3. ACC Glutamate
+gam_acc <- gam(decliner_regression ~ s(m_m_acc_z), 
+               data = MRS_prediction, 
+               family = "binomial")
+summary(gam_acc)
+
+# 4. Cortical Thickness (AD-Signature)
+gam_thick <- gam(decliner_regression ~ s(cortical_thickness_adsignature_dickson_z), 
+                 data = MRS_prediction, 
+                 family = "binomial")
+summary(gam_thick)
+
+# 5. Hippocampal Activation
+gam_hip <- gam(decliner_regression ~ s(arsenii_hippocampus_avg_act), 
+               data = MRS_prediction, 
+               family = "binomial")
+summary(gam_hip)

@@ -539,7 +539,7 @@ overall_m_sig(model_func_hip)
 #overall_m_sig(model_func_par)
 
 
-############# Hierarchical models ############
+############# Multimodal models ############
 
 #  ACC Glutamate + Plasma p-Tau217 + cortical thickenss 
 model_nocov_step_sig <- glm(decliner_regression ~ plasma_ptau217_z + m_m_acc_z + cortical_thickness_adsignature_dickson_z 
