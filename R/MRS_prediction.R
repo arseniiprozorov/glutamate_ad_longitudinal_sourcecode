@@ -378,12 +378,15 @@ full_lm_model <- lm(slope_regression_yearly ~ m_m_acc_z + m_m_precuneus_z + plas
                     data = MRS_step)
 
 library(olsrr)
-step_result <- ols_step_backward_p(full_lm_model, p_val = 0.3, details = TRUE)
+step_result <- ols_step_backward_p(full_lm_model, prem = 0.3, details = TRUE)
 
 # 3. Output
 print(step_result)
 summary(step_result$model)
 
+
+step_aic_result <- ols_step_backward_aic(full_lm_model, details = TRUE)
+print(step_aic_result)
 ########### Post hoc with tertials ########
 
 # Create Tertile Factor Variables (Low, Medium, High)
