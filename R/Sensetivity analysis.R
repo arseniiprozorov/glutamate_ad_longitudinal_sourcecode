@@ -381,3 +381,21 @@ aggregate(cbind(initiale_age, education, initiale_moca_score_total_30, slope_reg
 table(MRS_prediction$sexe, MRS_prediction$complete_case)
 table(MRS_prediction$diagnostic_nick, MRS_prediction$complete_case)
 table(MRS_prediction$decliner_regression, MRS_prediction$complete_case)
+
+
+
+
+
+
+
+# 1. Overall follow-up duration (Mean, SD, Median, Min, Max)
+summary(MRS_prediction$max_years_from_baseline)
+sd(MRS_prediction$max_years_from_baseline, na.rm = TRUE)
+
+# 2. Check if follow-up duration differed between Stable and Decliners
+t.test(max_years_from_baseline ~ decliner_regression, data = MRS_prediction)
+
+# 3. Test the proportional hazards assumption (Schoenfeld residuals)
+cox.zph(surv_acc)
+cox.zph(surv_prec)
+

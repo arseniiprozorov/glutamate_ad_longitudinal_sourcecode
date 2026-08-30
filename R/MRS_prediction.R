@@ -613,7 +613,7 @@ summary(cox_nocov)
 
 
 
-# 1. split into tertiales 
+# split into tertiales 
 ptau217_tertiles <- quantile(MRS_prediction$plasma_ptau217_z, probs = c(0, 1/3, 2/3, 1), na.rm = TRUE)
 acc_terials <- quantile(MRS_prediction$m_m_acc_z, probs = c(0, 1/3, 2/3, 1), na.rm = TRUE)
 precuneus_terials <- quantile(MRS_prediction$m_m_precuneus_z, probs = c(0, 1/3, 2/3, 1), na.rm = TRUE)
@@ -650,81 +650,48 @@ MRS_prediction$hip_act_tertiales <- cut(MRS_prediction$arsenii_hippocampus_avg_a
 
 
 
-# Plasma p-Tau217 Tertiles
-fit_ptau217 <- survfit(
-  Surv(max_years_from_baseline, decliner_regression) ~ ptau217_tertiales, 
-  data = MRS_prediction
-)
-summary(fit_ptau217)
-
-
 
 survfit(Surv(max_years_from_baseline, decliner_regression) ~ acc_tertiales, data = MRS_prediction)
 
 survfit(Surv(max_years_from_baseline, decliner_regression) ~ precuneus_tertiales, data = MRS_prediction)
 
+
+# Plasma p-Tau217 Tertiles
+#fit_ptau217 <- survfit(
+#  Surv(max_years_from_baseline, decliner_regression) ~ ptau217_tertiales, 
+#  data = MRS_prediction)
+#(fit_ptau217)
+
 # Cortical Thickness (AD-Signature) Tertiles
-fit_thick <- survfit(
-  Surv(max_years_from_baseline, decliner_regression) ~ cortical_thick_tertiales, 
-  data = MRS_prediction)
-summary(fit_thick)
+#fit_thick <- survfit(
+#  Surv(max_years_from_baseline, decliner_regression) ~ cortical_thick_tertiales, 
+#  data = MRS_prediction)
+#summary(fit_thick)
 
 # Hippocampal Activation Tertiles
-fit_hip_act <- survfit(Surv(max_years_from_baseline, decliner_regression) ~ hip_act_tertiales, 
-  data = MRS_prediction)
-summary(fit_hip_act)
+#fit_hip_act <- survfit(Surv(max_years_from_baseline, decliner_regression) ~ hip_act_tertiales, 
+#  data = MRS_prediction)
+#summary(fit_hip_act)
 
 
 
 
+### Multimodal Keplen Mayer curve
+MRS_prediction$multimodal_risk_score <- predict(cox_nocov, newdata = MRS_prediction, type = "lp", na.action = na.pass)
 
-
-#Baseline survival curve evaluating predictors at their mean values
-surv_fit_full  <- survfit(cox_full)
-surv_fit_nocov <- survfit(cox_nocov)
-
-# Prints the estimated median survival time (if curve drops <= 0.50)
-print(surv_fit_full)
-print(surv_fit_nocov)
-
-# Detailed survival step-table
-summary(surv_fit_full)
-summary(surv_fit_nocov)
-
-
-# 3. Model-Adjusted Median Survival Across Risk Strata (e.g., Low vs High ACC Glu)
-
-# (Evaluating ACC Glu tertile effects holding p-tau217 & thickness at mean = 0)
-new_cases_nocov <- data.frame(
-  plasma_ptau217_z = c(0, 0, 0),
-  m_m_acc_z = c(-1, 0, 1), # Low (-1 SD), Mean (0 SD), High (+1 SD)
-  cortical_thickness_adsignature_dickson_z = c(0, 0, 0),
-  Risk_Group = c("Low ACC Glu (-1 SD)", "Average ACC Glu (0 SD)", "High ACC Glu (+1 SD)")
+MRS_prediction$multimodal_risk_tertiles <- cut(
+  MRS_prediction$multimodal_risk_score,
+  breaks = quantile(MRS_prediction$multimodal_risk_score, probs = 0:3/3, na.rm = TRUE),
+  labels = c("Low Risk Profile", "Intermediate Risk Profile", "High Risk Profile"),
+  include.lowest = TRUE
 )
 
-# Fit adjusted survival curves for these clinical profiles
-surv_pred_nocov <- survfit(cox_nocov, newdata = new_cases_nocov)
-
-# Print median survival times across the 3 covariate-adjusted profiles
-print(surv_pred_nocov)
+# 2. Fit and summarize Kaplan-Meier model
+fit_multimodal <- survfit(Surv(max_years_from_baseline, decliner_regression) ~ multimodal_risk_tertiles, data = MRS_prediction)
+summary(fit_multimodal)
 
 
 
 
 
-
-
-
-
-
-# 1. Overall follow-up duration (Mean, SD, Median, Min, Max)
-summary(MRS_prediction$max_years_from_baseline)
-sd(MRS_prediction$max_years_from_baseline, na.rm = TRUE)
-
-# 2. Check if follow-up duration differed between Stable and Decliners
-t.test(max_years_from_baseline ~ decliner_regression, data = MRS_prediction)
-
-# 3. Test the proportional hazards assumption (Schoenfeld residuals)
-cox.zph(surv_acc)
-cox.zph(surv_prec)
 
