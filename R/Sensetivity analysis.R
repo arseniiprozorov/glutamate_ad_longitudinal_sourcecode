@@ -320,3 +320,64 @@ gam_hip <- gam(decliner_regression ~ s(arsenii_hippocampus_avg_act),
                data = MRS_prediction, 
                family = "binomial")
 summary(gam_hip)
+
+
+
+
+
+
+
+
+
+names(MRS_prediction)
+##### Sensetivty analysis of missing participants ########
+# --- 1. Identify Included vs Excluded Participants ---
+MRS_prediction$complete_case <- ifelse(
+  complete.cases(MRS_prediction[, c("slope_regression_yearly", "m_m_acc_z", 
+                                    "m_m_precuneus_z", "plasma_ptau217_z", 
+                                    "cortical_thickness_adsignature_dickson_z", 
+                                    "arsenii_hippocampus_avg_act", "sexe", 
+                                    "diagnostic_nick", "education", "initiale_age", "age_difference")]),
+  "Included", "Excluded"
+)
+
+# Check sample sizes (should be 48 vs 36)
+table(MRS_prediction$complete_case)
+
+# --- 2. Demographic & Baseline Comparisons ---
+# Age comparison
+cat("\n--- AGE ---\n")
+t.test(initiale_age ~ complete_case, data = MRS_prediction)
+
+# Education comparison
+cat("\n--- EDUCATION ---\n")
+t.test(education ~ complete_case, data = MRS_prediction)
+
+# Sex comparison
+cat("\n--- SEX ---\n")
+chisq.test(table(MRS_prediction$sexe, MRS_prediction$complete_case))
+
+# Clinical Diagnostic status comparison
+cat("\n--- DIAGNOSIS (SCD vs MCI) ---\n")
+chisq.test(table(MRS_prediction$diagnostic_nick, MRS_prediction$complete_case))
+# --- 3. Cognitive Comparisons ---
+# Baseline MoCA comparison
+cat("\n--- BASELINE MOCA ---\n")
+t.test(initiale_moca_score_total_30 ~ complete_case, data = MRS_prediction)
+
+# Longitudinal cognitive slope comparison
+cat("\n--- ANNUALIZED SLOPE ---\n")
+t.test(slope_regression_yearly ~ complete_case, data = MRS_prediction)
+
+# Clinically meaningful decliners proportion (Krishnan threshold)
+cat("\n--- DECLINER STATUS (KRISHNAN) ---\n")
+chisq.test(table(MRS_prediction$decliner_regression, MRS_prediction$complete_case))
+
+
+# Get Means and SDs
+aggregate(cbind(initiale_age, education, initiale_moca_score_total_30, slope_regression_yearly) ~ complete_case, data = MRS_prediction, FUN = function(x) c(mean = mean(x), sd = sd(x)))
+
+# Get Counts for Categorical variables
+table(MRS_prediction$sexe, MRS_prediction$complete_case)
+table(MRS_prediction$diagnostic_nick, MRS_prediction$complete_case)
+table(MRS_prediction$decliner_regression, MRS_prediction$complete_case)
