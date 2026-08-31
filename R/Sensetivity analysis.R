@@ -71,131 +71,6 @@ overall_m_sig(model_full_step_sig)
 
 
 
-#### Supplementary Figure: Exploratory Bimodal ROC Curves ######
-library(pROC)
-library(ggplot2)
-
-# ==============================================================================
-# 0. Helper: Extract and Format ROC Dataframe with Explicit (0,0) and (1,1)
-# ==============================================================================
-get_roc_df <- function(roc_obj, model_name) {
-  df <- data.frame(
-    fpr = 1 - roc_obj$specificities,
-    tpr = roc_obj$sensitivities,
-    model = model_name
-  )
-  # Ensure strict (0,0) and (1,1) boundaries
-  df <- rbind(data.frame(fpr = 0, tpr = 0, model = model_name),
-              df,
-              data.frame(fpr = 1, tpr = 1, model = model_name))
-  # Sort strictly by FPR then TPR for clean geom_path drawing
-  df <- df[order(df$fpr, df$tpr), ]
-  rownames(df) <- NULL
-  return(df)
-}
-
-# 1. Build tidy dataframes for all 6 Bimodal Models
-df_ptau_acc   <- get_roc_df(roc_ptau217_acc,   "Plasma p-tau217 + ACC Glu")
-df_ptau_prec  <- get_roc_df(roc_ptau217_prec,  "Plasma p-tau217 + Precuneus Glu")
-df_prec_thick <- get_roc_df(roc_prec_thick,    "Precuneus Glu + Cortical Thickness")
-df_acc_thick  <- get_roc_df(roc_acc_thick,     "ACC Glu + Cortical Thickness")
-df_prec_hip   <- get_roc_df(roc_prec_hip_act,  "Precuneus Glu + Hippocampal Act")
-df_acc_hip    <- get_roc_df(roc_acc_hip_act,   "ACC Glu + Hippocampal Act")
-
-df_bimodal <- rbind(df_ptau_acc, df_ptau_prec, df_prec_thick, 
-                    df_acc_thick, df_prec_hip, df_acc_hip)
-
-model_levels <- c(
-  "Plasma p-tau217 + ACC Glu",
-  "Plasma p-tau217 + Precuneus Glu",
-  "Precuneus Glu + Cortical Thickness",
-  "ACC Glu + Cortical Thickness",
-  "Precuneus Glu + Hippocampal Act",
-  "ACC Glu + Hippocampal Act"
-)
-df_bimodal$model <- factor(df_bimodal$model, levels = model_levels)
-
-# ==============================================================================
-# 2. Colors & Youden Operating Points
-# ==============================================================================
-bimodal_colors <- c(
-  "Plasma p-tau217 + ACC Glu"          = "#E64B35", # High-contrast Red (Top model: AUC 75.7%)
-  "Plasma p-tau217 + Precuneus Glu"   = "#F39B7F", # Coral
-  "Precuneus Glu + Cortical Thickness" = "#4DBBD5", # Cyan
-  "ACC Glu + Cortical Thickness"       = "#00A087", # Teal
-  "Precuneus Glu + Hippocampal Act"    = "#3C5488", # Deep Navy
-  "ACC Glu + Hippocampal Act"          = "#7E6148"  # Slate/Brown
-)
-
-youden_bimodal <- data.frame(
-  model = model_levels,
-  fpr   = c(1 - 0.950, 1 - 0.786, 1 - 0.607, 1 - 0.850, 1 - 0.833, 1 - 0.755),
-  tpr   = c(0.571,     0.667,     0.682,     0.429,     0.619,     0.600)
-)
-youden_bimodal$model <- factor(youden_bimodal$model, levels = model_levels)
-
-# ==============================================================================
-# 3. Build ggplot
-# ==============================================================================
-p_bimodal <- ggplot() +
-  # Chance diagonal
-  geom_segment(
-    aes(x = 0, xend = 1, y = 0, yend = 1),
-    color = "grey65", linetype = "dashed", linewidth = 0.7
-  ) +
-  # ROC Curves via geom_path
-  geom_path(
-    data = df_bimodal,
-    aes(x = fpr, y = tpr, color = model),
-    linewidth = 1.05
-  ) +
-  # Optimal Operating Points (Youden)
-  geom_point(
-    data = youden_bimodal,
-    aes(x = fpr, y = tpr, color = model),
-    size = 2.8, shape = 19, show.legend = FALSE
-  ) +
-  scale_color_manual(values = bimodal_colors) +
-  scale_x_continuous(expand = c(0.01, 0.01), breaks = seq(0, 1, by = 0.2), limits = c(0, 1)) +
-  scale_y_continuous(expand = c(0.01, 0.01), breaks = seq(0, 1, by = 0.2), limits = c(0, 1)) +
-  labs(
-    title = "",
-    x = "1 - Specificity",
-    y = "Sensitivity",
-    color = NULL
-  ) +
-  theme_classic(base_size = 12, base_family = "Arial") +
-  theme(
-    plot.title        = element_text(face = "bold", size = 13),
-    axis.title        = element_text(face = "bold", size = 11),
-    axis.text         = element_text(color = "black", size = 10),
-    legend.position   = c(0.68, 0.25),
-    legend.text       = element_text(size = 9, face = "bold"),
-    legend.background = element_rect(fill = alpha("white", 0.85), color = "grey85", linewidth = 0.5),
-    legend.key.height = unit(0.42, "cm"),
-    plot.margin       = margin(12, 12, 12, 12)
-  )
-
-# ==============================================================================
-# 4. TIFF Export (1200 DPI, LZW Compression)
-# ==============================================================================
-out_dir <- "C:/Users/okkam/Desktop/labo/article 2/A&D"
-if (!dir.exists(out_dir)) dir.create(out_dir, recursive = TRUE)
-
-tiff(
-  filename    = file.path(out_dir, "fig_supp_bimodal_roc_curves_1200dpi.tiff"),
-  width       = 7.0,
-  height      = 6.5,
-  units       = "in",
-  res         = 1200,
-  compression = "lzw"
-)
-print(p_bimodal)
-dev.off()
-
-
-
-
 
 
 
@@ -204,86 +79,84 @@ dev.off()
 ############ One leave out cross validation ##############
 library(pROC)
 
-# 1. Define the master LOOCV function
+# ==============================================================================
+# 1. Master LOOCV Function (Computes true out-of-sample metrics)
+# ==============================================================================
 run_loocv <- function(formula_str, data, model_name) {
   form <- as.formula(formula_str)
   vars <- all.vars(form)
   
-  # Isolate data for this specific model and drop missing observations
-  clean_data <- data[, vars, drop = FALSE]
+  # Extract relevant columns and handle missing data per model
+  clean_data <- as.data.frame(data[, vars, drop = FALSE])
   clean_data <- clean_data[complete.cases(clean_data), ]
   
   n <- nrow(clean_data)
   cv_predictions <- numeric(n)
   
-  # Loop row-by-row (Leave One Out)
+  # Leave-One-Out Loop
   for (i in 1:n) {
     train_set <- clean_data[-i, ]
     test_set  <- clean_data[i, ]
     
-    # Train on N-1 subjects
-    fit <- glm(form, data = train_set, family = "binomial")
-    
-    # Predict on the left-out subject
+    fit <- glm(form, data = train_set, family = binomial())
     cv_predictions[i] <- predict(fit, newdata = test_set, type = "response")
   }
   
-  # Generate true out-of-sample ROC curves
+  # Out-of-sample ROC and optimal threshold (Youden index)
   actual_outcomes <- clean_data[[vars[1]]]
   roc_cv <- pROC::roc(actual_outcomes, cv_predictions, quiet = TRUE)
-  
-  # Extract optimal threshold coordinates via Youden Index
   coords_cv <- pROC::coords(roc_cv, "best", ret = c("threshold", "specificity", "sensitivity"), best.method = "youden")
-  if (!is.null(nrow(coords_cv)) && nrow(coords_cv) > 1) coords_cv <- coords_cv[1, ]
   
-  # Calculate true out-of-sample classification accuracy
+  if (!is.null(nrow(coords_cv)) && nrow(coords_cv) > 1) {
+    coords_cv <- coords_cv[1, ]
+  }
+  
   predicted_classes <- ifelse(cv_predictions >= coords_cv$threshold, 1, 0)
   acc_cv <- mean(predicted_classes == actual_outcomes)
   
-  # Return metrics as a clean data frame row
   return(data.frame(
-    Model  = model_name,
-    N_Obs  = n,
-    CV_AUC = round(pROC::auc(roc_cv) * 100, 1),
-    CV_ACC = round(acc_cv * 100, 1),
-    CV_SEN = round(coords_cv$sensitivity * 100, 1),
-    CV_SPE = round(coords_cv$specificity * 100, 1)
+    Model          = model_name,
+    N              = n,
+    CV_AUC         = round(pROC::auc(roc_cv) * 100, 1),
+    CV_Accuracy    = round(acc_cv * 100, 1),
+    CV_Sensitivity = round(coords_cv$sensitivity * 100, 1),
+    CV_Specificity = round(coords_cv$specificity * 100, 1),
+    Optimal_Cutoff = round(coords_cv$threshold, 3)
   ))
 }
 
-# 2. Map every single one of your models to its exact formula string
+# ==============================================================================
+# 2. Define Your Exact Models
+# ==============================================================================
 models_to_test <- list(
   # --- Unimodal Models ---
-  c("decliner_regression ~ plasma_ptau217_z", "Unimodal: Plasma p-Tau217"),
-  c("decliner_regression ~ m_m_precuneus_z", "Unimodal: Precuneus Glutamate"),
-  c("decliner_regression ~ m_m_acc_z", "Unimodal: ACC Glutamate"),
-  c("decliner_regression ~ hipp_mean_z", "Unimodal: Hippocampal Volume"),
-  c("decliner_regression ~ cortical_thickness_adsignature_dickson_z", "Unimodal: Cortical Thickness"),
-  c("decliner_regression ~ hipp_mean_act_z", "Unimodal: Hippocampal Activation"),
-  c("decliner_regression ~ activation_parietal_sup_l_z", "Unimodal: Superior Parietal Activation"),
+  c("decliner_regression ~ plasma_ptau217_z", 
+    "Unimodal: Plasma p-Tau217"),
+  c("decliner_regression ~ m_m_precuneus_z", 
+    "Unimodal: Precuneus Glutamate"),
+  c("decliner_regression ~ m_m_acc_z", 
+    "Unimodal: ACC Glutamate"),
+  c("decliner_regression ~ cortical_thickness_adsignature_dickson_z", 
+    "Unimodal: Cortical Thickness"),
+  c("decliner_regression ~ arsenii_hippocampus_avg_act", 
+    "Unimodal: Hippocampal Activation"),
   
-  # --- Bivariate Models ---
-  c("decliner_regression ~ plasma_ptau217_z + m_m_acc_z", "Bivariate: p-Tau217 + ACC Glu"),
-  c("decliner_regression ~ plasma_ptau217_z + m_m_precuneus_z", "Bivariate: p-Tau217 + Precuneus Glu"),
-  c("decliner_regression ~ m_m_precuneus_z + cortical_thickness_adsignature_dickson_z", "Bivariate: Precuneus Glu + Cortical Thickness"),
-  c("decliner_regression ~ m_m_acc_z + cortical_thickness_adsignature_dickson_z", "Bivariate: ACC Glu + Cortical Thickness"),
-  c("decliner_regression ~ m_m_precuneus_z + hipp_mean_z", "Bivariate: Precuneus Glu + Hippocampal Volume"),
-  c("decliner_regression ~ m_m_acc_z + hipp_mean_z", "Bivariate: ACC Glu + Hippocampal Volume"),
-  c("decliner_regression ~ m_m_precuneus_z + activation_parietal_sup_l_z", "Bivariate: Precuneus Glu + Parietal Activation"),
-  c("decliner_regression ~ m_m_acc_z + activation_parietal_sup_l_z", "Bivariate: ACC Glu + Parietal Activation"),
-  c("decliner_regression ~ m_m_precuneus_z + hipp_mean_act_z", "Bivariate: Precuneus Glu + Hippocampal Activation"),
-  c("decliner_regression ~ m_m_acc_z + hipp_mean_act_z", "Bivariate: ACC Glu + Hippocampal Activation"),
-  c("decliner_regression ~ m_m_precuneus_z + m_m_acc_z", "Bivariate: Precuneus Glu + ACC Glu")
+  # --- Multimodal Model ---
+  c("decliner_regression ~ plasma_ptau217_z + m_m_acc_z + cortical_thickness_adsignature_dickson_z", 
+    "Multimodal: ACC Glu + p-Tau217 + Cortical Thickness")
 )
 
-# 3. Execute the cross-validation loop over your dataset
-loocv_results_list <- lapply(models_to_test, function(m) {
+# ==============================================================================
+# 3. Run Validation and Display Summary Table
+# ==============================================================================
+loocv_results <- do.call(rbind, lapply(models_to_test, function(m) {
   run_loocv(formula_str = m[1], data = MRS_prediction, model_name = m[2])
-})
+}))
 
-# 4. Bind into a clear, unified master results matrix
-master_loocv_table <- do.call(rbind, loocv_results_list)
-print(master_loocv_table)
+print(loocv_results, row.names = FALSE)
+
+
+
 
 
 

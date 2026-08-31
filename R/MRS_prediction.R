@@ -9,6 +9,7 @@ library(lmerTest)
 library(pROC)
 library(openxlsx)
 library(survival)
+library(olsrr)
 options(na.action = "na.omit")
 
 ## Predicting cognitive change using metabolic, tau, functional and structural predictors  ######
@@ -315,9 +316,8 @@ summary(mixed_model_activation_parietal_l)
 
 
 ########################################### The Multimodal  Model###############################
-# Syntax
-#ols_step_backward_p(OLS_mod0,prem=0.1)
-library(olsrr)
+# Syntax Isaora
+#ols_step_backward_p(OLS_mod0,prem=0.1) 
 help(package = olsrr)
 citation("olsrr")
 ########### backward stepwise lienar mixed regression ################
@@ -330,17 +330,16 @@ MRS_step <- na.omit(MRS_prediction[, c("slope_regression_yearly", "m_m_acc_z",
                                              "arsenii_hippocampus_avg_act", "sexe", 
                                              "diagnostic_nick", "education", "initiale_age", "age_difference")])
 
-# 2. Full multivariable model & backward selection
+#  Full multivariable model & backward selection
 full_lm_model <- lm(slope_regression_yearly ~ m_m_acc_z + m_m_precuneus_z + plasma_ptau217_z + 
                       cortical_thickness_adsignature_dickson_z + arsenii_hippocampus_avg_act + 
                       sexe + diagnostic_nick + education + initiale_age + age_difference, 
                     data = MRS_step)
 
-library(olsrr)
 step_result <- ols_step_backward_p(full_lm_model, p_val = 0.25, details = TRUE)
 
 
-# 3. Output
+# Output
 print(step_result)
 summary(step_result$model)
 
@@ -376,7 +375,7 @@ q_hip <- quantile(MRS_prediction_long$arsenii_hippocampus_avg_act, probs = c(0, 
 MRS_prediction_long$hipp_act_tert <- cut(MRS_prediction_long$arsenii_hippocampus_avg_act, breaks = q_hip, 
                                          labels = c("Low", "Medium", "High"), include.lowest = TRUE)
 
-# 1. Plasma p-Tau217 Tertiles
+#  Plasma p-Tau217 Tertiles
 mod_ptau_tert <- lmer(moca ~ years_from_baseline * ptau217_tert + age_difference + sexe + 
                         diagnostic_nick + education + initiale_age + (1 | pscid), data = MRS_prediction_long)
 
@@ -384,7 +383,7 @@ slopes_ptau <- emtrends(mod_ptau_tert, ~ ptau217_tert, var = "years_from_baselin
 summary(slopes_ptau, infer = TRUE)
 pairs(slopes_ptau)
 
-# 2. ACC Glutamate Tertiles
+#  Glutamate Tertiles
 mod_acc_tert <- lmer(moca ~ years_from_baseline * acc_tert + sexe + diagnostic_nick + 
                        education + initiale_age + (1 | pscid), data = MRS_prediction_long)
 
@@ -393,7 +392,7 @@ summary(slopes_acc, infer = TRUE)
 pairs(slopes_acc)
 
 names(MRS_prediction_long)
-# 3. Precuneus Glutamate Tertiles
+#  Precuneus Glutamate Tertiles
 
 mod_prec_tert <- lmer(moca ~ years_from_baseline * precuneus_tert + sexe + diagnostic_nick + 
                         education + (1 | pscid), data = MRS_prediction_long)
@@ -403,7 +402,7 @@ summary(slopes_prec, infer = TRUE)
 pairs(slopes_prec)
 
 
-# 4. AD-Signature Cortical Thickness Tertiles
+#  AD-Signature Cortical Thickness Tertiles
 mod_thick_tert <- lmer(moca ~ years_from_baseline * thickness_tert + sexe + diagnostic_nick + 
                          education + initiale_age + (1 | pscid), data = MRS_prediction_long)
 
@@ -412,7 +411,7 @@ summary(slopes_thick, infer = TRUE)
 pairs(slopes_thick)
 
 
-# 5. Hippocampal Activation Tertiles
+# Hippocampal Activation Tertiles
 mod_hip_tert <- lmer(moca ~ years_from_baseline * hipp_act_tert + sexe + diagnostic_nick + 
                        education + initiale_age + (1 | pscid), data = MRS_prediction_long)
 
@@ -436,7 +435,7 @@ overall_m_sig <- function(model) {
 #overall_m_sig(object)
 
 
-#sink("glm_models_sensetivity_decliners.txt")
+#sink("Table 3.txt")
 
 # plasma_ptau217 
 model_glu_ptau217 <- glm(decliner_regression ~ plasma_ptau217_z  , data = MRS_prediction, family = "binomial")
@@ -499,7 +498,7 @@ overall_m_sig(model_func_hip)
 #overall_m_sig(model_func_par)
 
 
-############# Multimodal models ############
+############ Multimodal model ############
 
 #  ACC Glutamate + Plasma p-Tau217 + cortical thickenss 
 model_nocov_step_sig <- glm(decliner_regression ~ plasma_ptau217_z + m_m_acc_z + cortical_thickness_adsignature_dickson_z 
@@ -510,66 +509,6 @@ roc_model_nocov_step_sig <- roc(model_nocov_step_sig$y, fitted(model_nocov_step_
 auc(roc_model_nocov_step_sig)
 coords(roc_model_nocov_step_sig, "best", ret=c("threshold", "specificity", "sensitivity"), best.method="youden")
 overall_m_sig(model_nocov_step_sig)
-
-############ Exploratory 2 Variable Models ##############
-
-
-# 1. Plasma p-Tau217 and ACC Glutamate
-model_ptau217_acc <- glm(decliner_regression ~ plasma_ptau217_z + m_m_acc_z, data = MRS_prediction, family = "binomial")
-summary(model_ptau217_acc)
-roc_ptau217_acc <- roc(model_ptau217_acc$y, fitted(model_ptau217_acc))
-auc(roc_ptau217_acc)
-coords(roc_ptau217_acc, "best", ret=c("threshold", "specificity", "sensitivity"), best.method="youden")
-overall_m_sig(model_ptau217_acc)
-
-# 2. Plasma p-Tau217 and Precuneus Glutamate
-model_ptau217_prec <- glm(decliner_regression ~ plasma_ptau217_z + m_m_precuneus_z, data = MRS_prediction, family = "binomial")
-summary(model_ptau217_prec)
-roc_ptau217_prec <- roc(model_ptau217_prec$y, fitted(model_ptau217_prec))
-auc(roc_ptau217_prec)
-coords(roc_ptau217_prec, "best", ret=c("threshold", "specificity", "sensitivity"), best.method="youden")
-overall_m_sig(model_ptau217_prec)
-
-# 3. Precuneus Glutamate + AD-Signature Cortical Thickness
-model_prec_thick <- glm(decliner_regression ~ m_m_precuneus_z + cortical_thickness_adsignature_dickson_z, data = MRS_prediction, family = "binomial")
-summary(model_prec_thick)
-roc_prec_thick <- roc(model_prec_thick$y, fitted(model_prec_thick))
-auc(roc_prec_thick)
-coords(roc_prec_thick, "best", ret=c("threshold", "specificity", "sensitivity"), best.method="youden")
-overall_m_sig(model_prec_thick)
-
-# 4. ACC Glutamate + AD-Signature Cortical Thickness
-model_acc_thick <- glm(decliner_regression ~ m_m_acc_z + cortical_thickness_adsignature_dickson_z, data = MRS_prediction, family = "binomial")
-summary(model_acc_thick)
-roc_acc_thick <- roc(model_acc_thick$y, fitted(model_acc_thick))
-auc(roc_acc_thick)
-coords(roc_acc_thick, "best", ret=c("threshold", "specificity", "sensitivity"), best.method="youden")
-overall_m_sig(model_acc_thick)
-
-
-# 5. Precuneus Glutamate + Hippocampal Activation
-model_prec_hip_act <- glm(decliner_regression ~ m_m_precuneus_z + arsenii_hippocampus_avg_act, data = MRS_prediction, family = "binomial")
-summary(model_prec_hip_act)
-roc_prec_hip_act <- roc(model_prec_hip_act$y, fitted(model_prec_hip_act))
-auc(roc_prec_hip_act)
-coords(roc_prec_hip_act, "best", ret=c("threshold", "specificity", "sensitivity"), best.method="youden")
-overall_m_sig(model_prec_hip_act)
-
-# 6. ACC Glutamate + Hippocampal Activation
-model_acc_hip_act <- glm(decliner_regression ~ m_m_acc_z + arsenii_hippocampus_avg_act, data = MRS_prediction, family = "binomial")
-summary(model_acc_hip_act)
-roc_acc_hip_act <- roc(model_acc_hip_act$y, fitted(model_acc_hip_act))
-auc(roc_acc_hip_act)
-coords(roc_acc_hip_act, "best", ret=c("threshold", "specificity", "sensitivity"), best.method="youden")
-overall_m_sig(model_acc_hip_act)
-
-
-
-
-#sink()
-
-
-
 
 
 
@@ -650,7 +589,6 @@ MRS_prediction$hip_act_tertiales <- cut(MRS_prediction$arsenii_hippocampus_avg_a
 
 
 
-
 survfit(Surv(max_years_from_baseline, decliner_regression) ~ acc_tertiales, data = MRS_prediction)
 
 survfit(Surv(max_years_from_baseline, decliner_regression) ~ precuneus_tertiales, data = MRS_prediction)
@@ -683,15 +621,14 @@ MRS_prediction$multimodal_risk_tertiles <- cut(
   MRS_prediction$multimodal_risk_score,
   breaks = quantile(MRS_prediction$multimodal_risk_score, probs = 0:3/3, na.rm = TRUE),
   labels = c("Low Risk Profile", "Intermediate Risk Profile", "High Risk Profile"),
-  include.lowest = TRUE
-)
+  include.lowest = TRUE)
 
-# 2. Fit and summarize Kaplan-Meier model
+# Fit and summarize Kaplan-Meier model
 fit_multimodal <- survfit(Surv(max_years_from_baseline, decliner_regression) ~ multimodal_risk_tertiles, data = MRS_prediction)
 summary(fit_multimodal)
 
 
 
 
-
+#sink()
 
