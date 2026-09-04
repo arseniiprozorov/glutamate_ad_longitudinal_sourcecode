@@ -771,9 +771,21 @@ names(MRS_prediction_long)
 #Surv(time, status): Defines the survival time and the event indicator (e.g., 1 for event, 0 for censored).
 #exp(coef): Represents the Hazard Ratio.If HR = 1, the risk is equal between groups.If HR = 1.5, the event rate is 50% higher at any given moment.
 
+# Bootstrap function
+library(survival)
+
+# Generic bootstrap function for any fitted coxph model
+boot_cox <- function(fit, B = 1000) {df_original <- eval(fit$call$data); f <- fit$formula
+  vars <- all.vars(f); df_model <- na.omit(df_original[, vars])
+  boot_mat <- replicate(B, {b_df <- df_model[sample(nrow(df_model), replace = TRUE), ]
+  exp(coef(coxph(f, data = b_df)))})
+  t(apply(boot_mat, 1, quantile, probs = c(0.025, 0.5, 0.975), na.rm = TRUE))}
+# Cox models
+
 surv_acc <- coxph(Surv(time_to_sustained_decline , sustained_decliner) ~ m_m_acc_z  + initiale_age, data = MRS_prediction)
 summary(surv_acc)
 exp(confint(surv_acc))
+boot_cox(surv_acc)
 
 surv_prec <- coxph(Surv(time_to_sustained_decline, sustained_decliner) ~ m_m_precuneus_z + initiale_age, data = MRS_prediction)
 summary(surv_prec)
@@ -790,24 +802,28 @@ summary(coxph(Surv(time_to_sustained_decline, sustained_decliner) ~ arsenii_hipp
 # Null model
 cox_null <- coxph(Surv(time_to_sustained_decline, sustained_decliner) ~ plasma_ptau217_z  + cortical_thickness_adsignature_dickson_z, data = MRS_prediction)
 summary(cox_null)
-
+boot_cox(cox_null)
 # + individual biomarkers
 cox_null_acc <- coxph(Surv(time_to_sustained_decline, sustained_decliner) ~ plasma_ptau217_z  + cortical_thickness_adsignature_dickson_z + 
                         m_m_acc_z, data = MRS_prediction)
 summary(cox_null_acc)
+boot_cox(cox_null_acc)
 
 cox_null_prec <- coxph(Surv(time_to_sustained_decline, sustained_decliner) ~ plasma_ptau217_z  + cortical_thickness_adsignature_dickson_z  +
                     m_m_precuneus_z , data = MRS_prediction)
 summary(cox_null_prec)
+boot_cox(cox_null_prec)
 
 cox_null_act <- coxph(Surv(time_to_sustained_decline, sustained_decliner) ~ plasma_ptau217_z  + cortical_thickness_adsignature_dickson_z +
                      arsenii_hippocampus_avg_act, data = MRS_prediction)
-summary(cox_null)
+summary(cox_null_act)
+boot_cox(cox_null_act)
 
 # Full model 
 cox_full <- coxph(Surv(time_to_sustained_decline, sustained_decliner) ~ plasma_ptau217_z  + cortical_thickness_adsignature_dickson_z + m_m_acc_z +
                      m_m_precuneus_z + arsenii_hippocampus_avg_act, data = MRS_prediction)
 summary(cox_full)
+boot_cox(cox_full)
 
 
 
